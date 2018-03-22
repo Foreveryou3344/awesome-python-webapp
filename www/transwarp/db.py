@@ -21,7 +21,10 @@ class _Engine(object):
 		self._connect=connect
 	def connect(self):
 		return self._connect()
-
+class DBError(Exception):
+	"""docstring for DBError"""
+	pass
+		
 def create_engine(user,password,database,host='127.0.0.1',port=3306,**kw):
 	import mysql.connector
 	global engine
@@ -130,6 +133,71 @@ def insert(table,**kw):
 	cols,args= zip(*kw.iteritems())
 	sql ='insert into `%s` (%s) value(%s)'% (table,','.join(['`%s`' % col for col in cols]),','.join(['?' for i in range(len(cols))])
 	return _update(sql,*args)
+	"""
+	zip 接受多个序列，将对应位置的元素组成tuple，tuple构成一个list
+	x=[[1,2,3],[4,5,6],[7,8,9]]
+	y=zip(*x)
+	print y 
+    结果：[(1,4, 7),(2,5,8),(3,6,9)]
+	join str.join(sequence) 返回指定字符串连接序列之后的新字符串
+	[表达式 for key in list]列表生成式
+	"""
+
+class Dict(dict):
+	def __init__(self,names=(),values=(),**kw):
+		super(Dict,self).__init__(**kw)
+		for k,v in zip(names,values):
+			self[k]=v
+	def __getattr__(self,key):
+		try:
+			return self[key]
+		except KeyError:
+			raise AttributeError(r"'Dict' object has no attribute '%s'" % key)
+	def __setattr__(self,key,value):
+		self[key]=value
+	"""
+	super 调用父类的方法 py3中用super().xxx代替py2中的super(class,self).xxx
+	__getattr__  __setattr__ dict.key时调用
+	"""
+		
+&with_connection
+def _select(sql,first,*args):
+	global _db_ctx
+	cursor = None
+	sql =sql.replace('?','%s')
+	logging.info('sql:%s,args:%s' % (sql,args))
+	try:
+		cursor = _db_ctx.connection.cursor()
+		cursor.execute(sql,args)
+		if cursor.description:
+			names=[x[0] for x in cursor.description]
+		if first:
+			values = cursor.fetchone()
+		    if not values:
+		    	return None
+		    return Dict(names,values)
+		return [Dict(names,x) for x in cursor.fetchall()]
+	finally:
+		if cursor:
+			cursor.close()
+        """
+        cursor.description 只用于select语句，返回一行的列名，为了Python DB API兼容，返回值为1*7的数组，但事实上后面的六个数为None
+        fetchone()  返回单个的元组，也就是一条记录(row)，如果没有结果 则返回 None
+        fetchall()  返回多个元组，即返回多个记录(rows),如果没有结果 则返回 ()
+        """
+def select(sql,*args):
+	return _select(sql,False,*args)
+class MultiColumnsError(DBError):
+	"""docstring for MultiColumnsError"""
+	pass
+		
+def select_int(sql,*args):
+	d= _select(sql,True,*args)
+	if len(d) != 1:
+		raise MultiColumnsError('Expect only one column')
+	return d.values()[0]
+def select_one(sql,*args):
+	return _select(sql,True,*args)
 if __name__ =='__main__':
 	logging.basicConfig(level=logging.DEBUG)
 	create_engine('root','password','test','127.0.0.1')
@@ -137,5 +205,10 @@ if __name__ =='__main__':
 	update('create table user (id int primary key,name text,email text,passwd text,last_modified real)')
 	userdic={id:001,name:'fangyu',email:'4465@qq.com',passwd:'passwd'}
 	insert('user',userdic)
+	L = select('select * from user where id=?', 200)
+	L[0].email
+	select_int('select count(*) from user where email=?', 'notexist@test.org')
+    u = select_one('select * from user where id=?', 100)
+    u.name
 	import doctest
 	doctest.testmod()
