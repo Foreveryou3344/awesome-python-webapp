@@ -16,6 +16,57 @@ def _profiling(start,sql=''):
 	else:
 		logging.info('[profiling][db] %s : %s' % (t,sql))
 
+class _TransactionCtx(object):
+	"""docstring for _TransactionCtx"""
+	def __enter__(self):
+		global _db_ctx
+		self.should_close_conn = False
+		if not _db_ctx.is_init():
+			_db_ctx.init()
+			self,should_close_conn = True
+		_db_ctx.transactions =_db_ctx.transactions+1
+		logging.info('begin transactions...' if _db_ctx.transactions==1 else 'join current transaction')
+		return self
+	def __exit__(self ,exctype,excvalue,traceback):
+		global _db_ctx
+		_db_ctx.transactions=_db_ctx.transactions-1
+		try:
+			if _db_ctx.transactions==0:
+				if exctype is None:
+					self.commit
+				else:
+					self.rollback()
+		finally:
+			if self.should_close_conn:
+				_db_ctx.cleanup()
+	def commit(self):
+		global _db_ctx
+		logging.info('commit transaction..')
+		try:
+			_db_ctx.connection.commit()
+			logging.info('commit ok')
+		except:
+			logging.warning('commit failed.try rollback...')
+			_db_ctx.connection.rollback()
+			logging.warning('rollback ok')
+			raise
+	def rollback(self):
+		global _db_ctx
+		logging.warning('rollback transaction')
+		_db_ctx.connection.rollback()
+		logging.info('rollback ok')
+
+def transaction():
+	return _TransactionCtx()
+def with_transaction(func):
+	@functools.wraps(func)
+	def _wrapper(*args,**kw):
+		_start = time.time()
+		with _TransactionCtx():
+			func(*args,**kw)
+		_profiling(_start)
+	return _wrapper
+
 class _Engine(object):
 	def __init__(self,connect):
 		self._connect=connect
@@ -34,19 +85,19 @@ def create_engine(user,password,database,host='127.0.0.1',port=3306,**kw):
 	if engine is not None:
 		raise DBError('Engine is already initialized.')
 	params =dict(user=user,password=password,database=database,host=host,port=port)
-	defaults =dict(use_unicode=True,charset='utf-8',collation='utf8_general_ci',autocommit=False)
+	defaults =dict(use_unicode=True,charset='utf8',collation='utf8_general_ci',autocommit=False)
 	for k,v in defaults.iteritems():
 		params[k]=kw.pop(k,v)
 	params.update(kw)
 	"""
 	dict.pop(key,default) 字典的pop方法在字典中找到key的项删除并返回对应的value，找不到则返回default默认值
 	"""
-	params.['buffered']=True
+	params['buffered']=True
 	engine=_Engine(lambda:mysql.connector.connect(**params))
 	logging.info('Init mysql engine <%s> ok' % hex(id(engine)))
 
 class _LasyConnection(object):
-	def __init__():
+	def __init__(self):
 		self.connection=None
 	def cursor(self):
 		if self.connection is None:
@@ -64,7 +115,7 @@ class _LasyConnection(object):
 		if self.connection:
 			_connection=self.connection
 			self.connection=None
-			logging.info('[connection][close] connection <%s>' % hex(id(connection)))
+			logging.info('[connection][close] connection <%s>' % hex(id(_connection)))
 			_connection.close()
 
 class _DbCtx(threading.local):
@@ -131,8 +182,8 @@ def update(sql,*args):
 
 def insert(table,**kw):
 	cols,args= zip(*kw.iteritems())
-	sql ='insert into `%s` (%s) value(%s)'% (table,','.join(['`%s`' % col for col in cols]),','.join(['?' for i in range(len(cols))])
-	return _update(sql,*args)
+	sql = 'insert into `%s` (%s) values (%s)' % (table, ','.join(['`%s`' % col for col in cols]), ','.join(['?' for i in range(len(cols))]))
+	return _update(sql, *args)
 	"""
 	zip 接受多个序列，将对应位置的元素组成tuple，tuple构成一个list
 	x=[[1,2,3],[4,5,6],[7,8,9]]
@@ -160,7 +211,7 @@ class Dict(dict):
 	__getattr__  __setattr__ dict.key时调用
 	"""
 		
-&with_connection
+@with_connection
 def _select(sql,first,*args):
 	global _db_ctx
 	cursor = None
@@ -173,9 +224,9 @@ def _select(sql,first,*args):
 			names=[x[0] for x in cursor.description]
 		if first:
 			values = cursor.fetchone()
-		    if not values:
-		    	return None
-		    return Dict(names,values)
+			if not values:
+				return  None
+			return Dict(names,values)
 		return [Dict(names,x) for x in cursor.fetchall()]
 	finally:
 		if cursor:
@@ -200,15 +251,15 @@ def select_one(sql,*args):
 	return _select(sql,True,*args)
 if __name__ =='__main__':
 	logging.basicConfig(level=logging.DEBUG)
-	create_engine('root','password','test','127.0.0.1')
+	create_engine('root','password','mypython','127.0.0.1')
 	update('drop table if exists user')
 	update('create table user (id int primary key,name text,email text,passwd text,last_modified real)')
-	userdic={id:001,name:'fangyu',email:'4465@qq.com',passwd:'passwd'}
-	insert('user',userdic)
+	userdic= dict(id=200, name='Wall.E', email='wall.e@test.org', passwd='back-to-earth', last_modified=time.time())
+	insert('user',**userdic)
 	L = select('select * from user where id=?', 200)
 	L[0].email
 	select_int('select count(*) from user where email=?', 'notexist@test.org')
-    u = select_one('select * from user where id=?', 100)
-    u.name
+	u = select_one('select * from user where id=?', 200)
+	u.name
 	import doctest
 	doctest.testmod()
