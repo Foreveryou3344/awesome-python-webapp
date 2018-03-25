@@ -4,6 +4,54 @@ import db
 import time
 import logging
 
+class ModelMetaclass(type):
+	"""docstring for ModelMetaclass"""
+	def __new__(cls,name,bases,attrs):
+		if name == 'Model':
+			return type.__new__(cls,name,bases,attrs)
+		if not hasattr(cls,'subclasses'):
+			cls.subclasses = {}
+		if not name in cls.subclasses:
+			cls.subclasses[name]= name
+		else:
+			logging.warning('redefine class :%s' % name)
+
+		logging.info('scan ormapping %s' % name)
+		mappings = dict()
+		primary_key =None
+		for k,v in attrs.iteritems():
+			if isinstance(v,Field):
+				if not v.name:
+					v.name = k
+				logging.info('Found mapping : %s =>%s' %(k,v))
+				if v.primary_key:
+					if primary_key:
+						raise TypeError('cannot define more than 1 primary key in class:%s' % name)
+					if v.updatable:
+						logging.warning('NOTE:change primary key to non-updatable')
+						v.updatable = False
+					if v.nullable:
+						logging.warning('NOTE:change primary key to non-nullable')
+						v.nullable = False
+					primary_key =v
+				mappings[k] =v
+		if not primary_key:
+			raise TypeError('primary key not defined in class : %s' % name)
+		for k in mappings.iterkeys():
+			attrs.pop(k)
+		if not '__table__' in attrs:
+			attrs['__table__'] = name.lower()
+		attrs['__mappings__'] = mappings
+		attrs['__primary_key__'] = primary_key
+		attrs['__sql__'] = lambda self :_gen_sql(attrs['__table__'],mappings)
+		for trigger in _triggers:
+			if not trigger in attrs:
+				attrs[trigger] = None
+		return type.__new__(cls,name,bases,attrs)
+		
+
+
+
 class Model(dict):
 	__metaclass__ = ModelMetaclass
 	def __init__(self,**kw):
@@ -37,7 +85,7 @@ class Model(dict):
 
 	@classmethod
 	def count_all(cls):
-		return db.select ('select count(`%s`) from `%s`' %(cls.__primary_key__.name,cls.__table__))
+		return db.select_int('select count(`%s`) from `%s`' %(cls.__primary_key__.name,cls.__table__))
 
 	@classmethod
 	def count_by(cls,where,*args):
@@ -47,7 +95,7 @@ class Model(dict):
 		self.pre_update and self.pre_update()
 		L=[]
 		args=[]
-		for k,v in self.__mapings__.iteritems():
+		for k,v in self.__mappings__.iteritems():
 			if v.updatable:
 				if hasattr(self,k):
 					arg=getattr(self,k)
@@ -69,7 +117,7 @@ class Model(dict):
 	def insert(self):
 		self.pre_insert and self.pre_insert()
 		params ={}
-		for k,v in self.__mapings__.iteritems():
+		for k,v in self.__mappings__.iteritems():
 			if v.insertable:
 				if not hasattr(self,k):
 					setattr(self,k,v.default)
