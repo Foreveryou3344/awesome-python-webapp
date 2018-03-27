@@ -102,9 +102,9 @@ def _gen_sql(table_name,mappings):
 class ModelMetaclass(type):
 	"""docstring for ModelMetaclass"""
 	def __new__(cls,name,bases,attrs):
-		if name == 'Model':
+		if name == 'Model':#如果Model则不需要做映射
 			return type.__new__(cls,name,bases,attrs)
-		if not hasattr(cls,'subclasses'):
+		if not hasattr(cls,'subclasses'):#subclasses??
 			cls.subclasses = {}
 		if not name in cls.subclasses:
 			cls.subclasses[name]= name
@@ -114,18 +114,18 @@ class ModelMetaclass(type):
 		logging.info('scan ormapping %s' % name)
 		mappings = dict()
 		primary_key =None
-		for k,v in attrs.iteritems():
+		for k,v in attrs.iteritems():#遍历具体表类的所有列属性
 			if isinstance(v,Field):
-				if not v.name:
+				if not v.name:#如果没有提供name则直接用key做列名
 					v.name = k
 				logging.info('Found mapping : %s =>%s' %(k,v))
-				if v.primary_key:
-					if primary_key:
+				if v.primary_key:#此列是关注字段
+					if primary_key:#已经存在关注字段
 						raise TypeError('cannot define more than 1 primary key in class:%s' % name)
-					if v.updatable:
+					if v.updatable:#关注字段不能更新
 						logging.warning('NOTE:change primary key to non-updatable')
 						v.updatable = False
-					if v.nullable:
+					if v.nullable:#不可为空
 						logging.warning('NOTE:change primary key to non-nullable')
 						v.nullable = False
 					primary_key =v
@@ -148,6 +148,9 @@ class ModelMetaclass(type):
 
 
 class Model(dict):
+	"""
+	__metaclass__ 元类 ，会调用ModelMetaClass.__new__(类变量，类的名字，父类集合，类的方法集合)
+	"""
 	__metaclass__ = ModelMetaclass
 	def __init__(self,**kw):
 		super(Model,self).__init__(**kw)
@@ -156,12 +159,13 @@ class Model(dict):
 			return self[key]
 		except KeyError:
 			raise AttributeError(r"'Dict' object has no attribute '%s'" % key)
-	def __serattr__(self,key,value):
+	def __setattr__(self,key,value):
 		self[key]=value
+	#classmethod 类方法 通过类名.方法名调用，首个参数是类变量
 	@classmethod
 	def get(cls,pk):
 		d=db.select_one('select * from %s where %s=?'%(cls.__table__,cls.__primary_key__.name),pk)
-		return cls(**d) if d else None
+		return cls(**d) if d else None #cls() 和类名()同义
 
 	@classmethod
 	def find_first(cls,where,*args):
@@ -171,7 +175,7 @@ class Model(dict):
 	@classmethod
 	def find_all(cls,*args):
 		L=db.select('select * from `%s`' %cls.__table__)
-		return [cls(**d) for d in L]
+		return [cls(**d) for d in L] #list生成器
 
 	@classmethod
 	def find_by(cls,where,*args):
@@ -186,11 +190,11 @@ class Model(dict):
 	def count_by(cls,where,*args):
 		return db.select_int('select count(`%s`) from `%s` %s'% (cls.__primary_key__.name,cls.__table__,where),*args)
 
-	def update(self):
-		self.pre_update and self.pre_update()
+	def update(self):#实例方法 通过类方法生成实例后，可以对实例进行操作
+		self.pre_update and self.pre_update()#如果存在pre_update这类自定义函数就执行
 		L=[]
 		args=[]
-		for k,v in self.__mappings__.iteritems():
+		for k,v in self.__mappings__.iteritems():#遍历表的所有列，该列可update的情况下如果实例中存在值则取值不存在则取默认值
 			if v.updatable:
 				if hasattr(self,k):
 					arg=getattr(self,k)
