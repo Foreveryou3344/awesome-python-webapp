@@ -88,6 +88,9 @@ _triggers = frozenset(['pre_insert','pre_update','pre_delete'])
 def _gen_sql(table_name,mappings):
 	pk = None
 	sql = ['-- generating sql for %s:' % table_name,'create table `%s`(' % table_name]
+	"""
+	sorted(可迭代对象，比较函数大于返回1，小于返回-1，等于0)
+	"""
 	for f in sorted(mappings.values(),lambda x,y:cmp(x._order,y._order)):
 		if not hasattr(f,'ddl'):
 			raise StandardError('no ddl in field "%s".' % f)
@@ -148,9 +151,92 @@ class ModelMetaclass(type):
 
 
 class Model(dict):
-	"""
+	'''
 	__metaclass__ 元类 ，会调用ModelMetaClass.__new__(类变量，类的名字，父类集合，类的方法集合)
-	"""
+	>>> class User(Model):
+
+    ...     id = IntegerField(primary_key=True)
+
+    ...     name = StringField()
+
+    ...     email = StringField(updatable=False)
+
+    ...     passwd = StringField(default=lambda: '******')
+
+    ...     last_modified = FloatField()
+
+    ...     def pre_insert(self):
+
+    ...         self.last_modified = time.time()
+
+    >>> u = User(id=10190, name='Michael', email='orm@db.org')
+
+    >>> r = u.insert()
+
+    >>> u.email
+
+    'orm@db.org'
+
+    >>> u.passwd
+
+    '******'
+
+    >>> u.last_modified > (time.time() - 2)
+
+    True
+
+    >>> f = User.get(10190)
+
+    >>> f.name
+
+    u'Michael'
+
+    >>> f.email
+
+    u'orm@db.org'
+
+    >>> f.email = 'changed@db.org'
+
+    >>> r = f.update() # change email but email is non-updatable!
+
+    >>> len(User.find_all())
+
+    1
+
+    >>> g = User.get(10190)
+
+    >>> g.email
+
+    u'orm@db.org'
+
+    >>> r = g.delete()
+
+    >>> len(db.select('select * from user where id=10190'))
+
+    0
+
+    >>> import json
+
+    >>> print User().__sql__()
+
+    -- generating SQL for user:
+
+    create table `user` (
+
+      `id` bigint not null,
+
+      `name` varchar(255) not null,
+
+      `email` varchar(255) not null,
+
+      `passwd` varchar(255) not null,
+
+      `last_modified` real not null,
+
+      primary key(`id`)
+
+    );
+	'''
 	__metaclass__ = ModelMetaclass
 	def __init__(self,**kw):
 		super(Model,self).__init__(**kw)
