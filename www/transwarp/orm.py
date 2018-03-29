@@ -107,7 +107,7 @@ class ModelMetaclass(type):
 	def __new__(cls,name,bases,attrs):
 		if name == 'Model':#如果Model则不需要做映射
 			return type.__new__(cls,name,bases,attrs)
-		if not hasattr(cls,'subclasses'):#subclasses??
+		if not hasattr(cls,'subclasses'):#cls指当前类，这里指ModelMetaclass,这四句话的意思是将派生类的名字放在subclasses的变量里面，防止重复定义
 			cls.subclasses = {}
 		if not name in cls.subclasses:
 			cls.subclasses[name]= name
@@ -153,90 +153,52 @@ class ModelMetaclass(type):
 class Model(dict):
 	'''
 	__metaclass__ 元类 ，会调用ModelMetaClass.__new__(类变量，类的名字，父类集合，类的方法集合)
-	>>> class User(Model):
+	
+	>>>class User(Model):
+	...	id = IntegerField(primary_key=True)
+	...	name = StringField()
+	...	email = StringField(updatable=False)
+	...	passwd = StringField(default=lambda: '******')
+	...	last_modified = FloatField()
+	...	def pre_insert(self):
+	...		self.last_modified = time.time()
+	>>>u = User(id=10190, name='Michael', email='orm@db.org')
+	>>>r = u.insert()
+	>>>u.email
+	'orm@db.org'
+	>>> u.passwd
+	'******'
+	>>> u.last_modified > (time.time() - 2)
+	True
+	>>> f = User.get(10190)
+	>>> f.name
+	u'Michael'
+	>>> f.email
+	u'orm@db.org'
+	>>> f.email = 'changed@db.org'
+	>>> r = f.update() # change email but email is non-updatable!
+	>>> len(User.find_all())
+	1
+	>>> g = User.get(10190)
+	>>> g.email
+	u'orm@db.org'
+	>>> r = g.delete()
+	>>> len(db.select('select * from user where id=10190'))
+	0
+	>>> import json
+	>>> print User().__sql__()
+	-- generating SQL for user:
+	create table `user` (
+	  `id` bigint not null,
+	  `name` varchar(255) not null,
+	  `email` varchar(255) not null,
+	  `passwd` varchar(255) not null,
+	  `last_modified` real not null,
+	  primary key(`id`)
+	);
 
-    ...     id = IntegerField(primary_key=True)
-
-    ...     name = StringField()
-
-    ...     email = StringField(updatable=False)
-
-    ...     passwd = StringField(default=lambda: '******')
-
-    ...     last_modified = FloatField()
-
-    ...     def pre_insert(self):
-
-    ...         self.last_modified = time.time()
-
-    >>> u = User(id=10190, name='Michael', email='orm@db.org')
-
-    >>> r = u.insert()
-
-    >>> u.email
-
-    'orm@db.org'
-
-    >>> u.passwd
-
-    '******'
-
-    >>> u.last_modified > (time.time() - 2)
-
-    True
-
-    >>> f = User.get(10190)
-
-    >>> f.name
-
-    u'Michael'
-
-    >>> f.email
-
-    u'orm@db.org'
-
-    >>> f.email = 'changed@db.org'
-
-    >>> r = f.update() # change email but email is non-updatable!
-
-    >>> len(User.find_all())
-
-    1
-
-    >>> g = User.get(10190)
-
-    >>> g.email
-
-    u'orm@db.org'
-
-    >>> r = g.delete()
-
-    >>> len(db.select('select * from user where id=10190'))
-
-    0
-
-    >>> import json
-
-    >>> print User().__sql__()
-
-    -- generating SQL for user:
-
-    create table `user` (
-
-      `id` bigint not null,
-
-      `name` varchar(255) not null,
-
-      `email` varchar(255) not null,
-
-      `passwd` varchar(255) not null,
-
-      `last_modified` real not null,
-
-      primary key(`id`)
-
-    );
 	'''
+
 	__metaclass__ = ModelMetaclass
 	def __init__(self,**kw):
 		super(Model,self).__init__(**kw)
@@ -255,7 +217,7 @@ class Model(dict):
 
 	@classmethod
 	def find_first(cls,where,*args):
-		d=db.select_one('select * from %s %s' (cls.__table__,where),*args)
+		d=db.select_one('select * from %s %s'% (cls.__table__,where),*args)
 		return cls(**d) if d else None
 
 	@classmethod
@@ -291,7 +253,7 @@ class Model(dict):
 				args.append(arg)
 		pk = self.__primary_key__.name
 		args.append(getattr(self,pk))
-		db.update('update `%s` set %s where %s = ?' % (self.__table__, ','join(L),pk),*args)
+		db.update('update `%s` set %s where %s = ?' % (self.__table__, ','.join(L),pk),*args)
 		return self
 	def delete(self):
 		self.pre_delete and self.pre_delete()
