@@ -29,3 +29,4 @@ class Dict(dict):
 
 _TIMEDELTA_ZERO = datetime.timedelta(0)
 
+_RE_TZ = re.compile('^([\+\-])[0-9]{1,2})\:([0-9]{1,2})$')
