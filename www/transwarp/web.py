@@ -223,3 +223,64 @@ def found(location):
 def seeother(location):
 	return RedirectError(303,location)
 	
+
+def _to_str(s):
+	if isinstance(s,str):
+		return s
+	if isinstance(s,unicode):
+		return s.encode('utf-8')
+	return str(s)
+
+def _to_unicode(s,encoding='utf-8'):
+	return s.decode('utf-8')
+
+def _quote(s,encoding='utf-8'):
+	if isinstance(s,unicode):
+		s= s.encode(encoding)
+	return urllib.quote(s)
+
+def _unquoto(s,encoding='utf-8'):
+	return urllib.unquoto(s).decode(encoding)
+
+def get(path):
+	def _decorator(func):
+		func.__web_route__ = path
+		func.__web_method__ = 'GET'
+		return func
+	return _decorator
+
+def post(path):
+	def _decorator(func):
+		func.__web_route__ = path
+		func.__web_method__ = 'POST'
+		return func
+	return _decorator
+
+_re_route = re.compile(r'(\:[a-zA-Z_]\w*)')
+
+def _build_regex(path):
+	re_list = ['^']
+	var_list = []
+	is_var = False
+	for v in _re_route.split(path):
+		if is_var:
+			var_name = v[1:]
+			var_list.append(var_name)
+			re_list.append(r'(?P<%s>[^\/]+)' % var_name)
+		else:
+			s = ''
+			for ch in v:
+				if ch>='0' and ch<='9':
+					s = s + ch
+				elif ch>='A' and ch<='Z':
+					s = s + ch
+				elif ch>='a' and ch<='z':
+					s = s + ch
+				else:
+					s = s + '\\' + ch
+			re_list.append(s)
+		is_var = not is_var
+	re_list.append('$')
+	return ''.join(re_list)
+
+class Route(object):
