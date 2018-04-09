@@ -333,3 +333,28 @@ class StaticFileRoute(object):
 		fext = os.path.splitext(fpath)[1]
 		ctx.response.content_type = mimetypes.types_map.get(fext.lower(),'application/octet-stream')
 		return _static_file_generator(fpath)
+
+def favicon_handler():
+	return static_file_handler('/favicon.ico')
+
+class MultipartFile(object):
+	def __init__(self,storage):
+		self.filename = _to_unicode(storage.filename)
+		self.file = storage.file
+
+class Request(object):
+	def __init__(self,environ):
+		self._environ = environ
+
+	def _parse_input(self):
+		def _convert(item):
+			if isinstance(item,list):
+				return [_to_unicode(i.value) for i in item]
+			if item.filename:
+				return MultipartFile(item)
+			return _to_unicode(item.value)
+		fs = cgi.FieldStorage(fp=self._environ['wsgi.input'],environ = self._environ,keep_blank_values =True)
+		inputs = dict()
+		for key in fs:
+			inputs[key] = _convert(fs[key])
+		return inputs
