@@ -566,6 +566,58 @@ class Respense(object):
 				raise ValueError('Bad response code:%s'  % value)
 		else:
 			raise TypeError('Bad type of response code')
+
+class Template(object):
+	def __init__(self,template_name,**kw):
+		self.template_name = template_name
+		self.model = dict(**kw)
+
+class TemplateEngine(object):
+	def __call__(self,path,model):
+		return '<!-- override this method to render template -->'
+
+class Jinja2TemplateEngine(TemplateEngine):
+	def __init__(self,templ_dir,**kw):
+		from jinja2 import Environment,FileSystemLoader
+		if not 'autoescape' in kw:
+			kw['autoescape'] = True
+		self._env = Environment(loader=FileSystemLoader(templ_dir),**kw)
+	def add_filter(self,name.fn_filter):
+		self._env.filters[name] = fn_filter
+
+	def __call__(self,path,model):
+		return self._env.get_template(path).render(**model).encode('utf-8')
+
+def _default_error_handler(e,start_response,is_debug):
+	if isinstance(e,HttpError):
+		logging.info('HttpError:%s' % e.status)
+		headers = e.headers[:]
+		headers.append(('Content-Type','text/html'))
+		start_response(e.status,headers)
+		return ('<html><body><h1>%s</h1></body></html>' % e.status)
+	logging.exception('Exception:')
+	start_response('500 Internal Server Error',[('Content-Type','text/html'),_HEADER_X_POWERED_BY])
+	if is_debug:
+		return _debug()
+	return ('<html><body><h1>500 Internal Server Error</h1><h3>%s</h3></body></html>' % str(e))
+
+def view(path):
+	def  _decorator(func):
+		@functools.wraps(func)
+		def _wrapper(*args,**kw):
+			r = func(*args,**kw)
+			if isinstance(r,dict):
+				logging.info('return Template')
+				return Template(path,**r)
+			raise ValueError('Expect return a dict when using @view() decorator')
+		return _wrapper
+	return _decorator
+
+_RE_INTERCEPTROR_STARTS_WITH = re.compile(r'^([^\*\?]+)\*?$')
+_RE_INTERCEPTROR_ENDS_WITH = re.compile(r'^\*([^\*\?]+)$')
+
+
+
 			
 
 
