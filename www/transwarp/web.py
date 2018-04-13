@@ -616,8 +616,24 @@ def view(path):
 _RE_INTERCEPTROR_STARTS_WITH = re.compile(r'^([^\*\?]+)\*?$')
 _RE_INTERCEPTROR_ENDS_WITH = re.compile(r'^\*([^\*\?]+)$')
 
-
-
+class WSGIApplication(object):
+	def __init__(self,document_root=None,**kw):
+		pass
+	def add_url(self,func):
+		pass
+	def add_interceptor(self,func):
+		pass
+	@property
+	def template_engine(self):
+		pass
+	@template_engine.setter
+	def template_engine(self,engine):
+		pass
+	def get_wsgi_application(self):
+		def wsgi(env,start_response):
+			pass
+		return wsgi
+	
 			
 
 
