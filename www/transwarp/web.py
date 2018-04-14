@@ -616,9 +616,61 @@ def view(path):
 _RE_INTERCEPTROR_STARTS_WITH = re.compile(r'^([^\*\?]+)\*?$')
 _RE_INTERCEPTROR_ENDS_WITH = re.compile(r'^\*([^\*\?]+)$')
 
+def _build_pattern_fn(pattern):
+	m = _RE_INTERCEPTROR_STARTS_WITH.match(pattern)
+	if m:
+		return lambda p:p.startswith(m.group(1))
+	m = _RE_INTERCEPTROR_ENDS_WITH.match(pattern)
+	if m:
+		return lambda p:p.endswith(m.group(1))
+	raise ValueError('Invalid pattern definition in interceptor')
+
+def interceptor(pattern='/'):
+	def _decotator(func):
+		func.__interceptor__ = _build_pattern_fn(pattern)
+		return func
+	return _decotator
+
+def _bulid_interceptor_fn(func,next):
+	def _wrapper():
+		if func.__interceptor__(ctx.request.path_info):
+			return func(next)
+		else:
+			return next()
+	return _wrapper
+
+def _bulid_interceptor_chain(last_fn,*interceptors):
+	L = list(interceptors)
+	L.reverse()
+	fn = last_fn
+	for f in L:
+		fn = _bulid_interceptor_fn(f,fn)
+	return fn
+
+def _load_module(module_name):
+	last_dot = module_name.rfind('.')
+	if last_dot ==(-1):
+		return __import__(module_name,globals(),locals())
+	from_module = module_name[:last_dot]
+	import_module = module_name[last_dot+1:]
+	m = __import__(from_module,globals(),locals(),[import_module])
+	return getattr(m,import_module)
+
+
 class WSGIApplication(object):
 	def __init__(self,document_root=None,**kw):
-		pass
+		self._running = False
+		self._document_root = document_root
+
+		self._interceptors = []
+		self._template_engine = None
+
+		self._get_static = {}
+		self._post_static = {}
+
+		self._get_dynamic = []
+		self._post_dynamic = []
+	
 	def add_url(self,func):
 		pass
 	def add_interceptor(self,func):
