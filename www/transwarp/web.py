@@ -52,7 +52,7 @@ class UTC(datetime.tzinfo):
 	def dst(self,dt):
 		return _TIMEDELTA_ZERO
 
-	def tzname(self.dt):
+	def tzname(self,dt):
 		return self._tzname
 
 	def __str__(self):
@@ -582,7 +582,7 @@ class Jinja2TemplateEngine(TemplateEngine):
 		if not 'autoescape' in kw:
 			kw['autoescape'] = True
 		self._env = Environment(loader=FileSystemLoader(templ_dir),**kw)
-	def add_filter(self,name.fn_filter):
+	def add_filter(self,name,fn_filter):
 		self._env.filters[name] = fn_filter
 
 	def __call__(self,path,model):
