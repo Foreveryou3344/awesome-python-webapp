@@ -281,7 +281,7 @@ def _select(sql, first, *args):
 
 
 def select(sql, *args):
-	return _select(sql, False, *args)
+    return _select(sql, False, *args)
 
 
 class MultiColumnsError(DBError):
