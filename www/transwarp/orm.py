@@ -4,38 +4,47 @@ import db
 import time
 import logging
 
+# 主要包含三部分内容：第一部分 Field和派生类 用于定义字段类型 可以设置默认值以及默认ddl
+# 第二部分 ModelMetaclass 基类 用于映射数据表和表类
+# 第三部分 Model 所有表类的父类 用于定义一些类方法比如find_first和实例方法update等
+
+
 class Field(object):
 	_count = 0
+
 	def __init__(self, **kw):
-		self.name = kw.get('name',None)
-		self._default = kw.get('default',None)
-		self.primary_key = kw.get('primary_key',False)
-		self.nullable = kw.get('nullable',False)
-		self.updatable = kw.get('updatable',True)
-		self.insertable = kw.get('insertable',True)
-		self.ddl = kw.get('ddl','')
+		self.name = kw.get('name', None)
+		self._default = kw.get('default', None)
+		self.primary_key = kw.get('primary_key', False)
+		self.nullable = kw.get('nullable', False)
+		self.updatable = kw.get('updatable', True)
+		self.insertable = kw.get('insertable', True)
+		self.ddl = kw.get('ddl', '')
 		self._order = Field._count
 		Field._count = Field._count + 1
 
 	@property
 	def default(self):
-		d= self._default
+		d = self._default
 		return d() if callable(d) else d
+
 	def __str__(self):
-		s = ['<%s:%s,%s,default(%s),' % (self.__class__.__name__,self.name,self.ddl,self._default)]
+		s = ['<%s:%s,%s,default(%s),' % (self.__class__.__name__, self.name, self.ddl, self._default)]
 		self.nullable and s.append('N')
 		self.updatable and s.append('U')
 		self.insertable and s.append('I')
 		s.append('>')
 		return ''.join(s)
 
+
 class StringField(Field):
-	def __init__(self,**kw):
+	def __init__(self, **kw):
 		if not 'default' in kw:
 			kw['default'] = ''
 		if not 'ddl' in kw:
 			kw['ddl'] = 'varchar(255)'
-		super(StringField,self).__init__(**kw)
+		super(StringField, self).__init__(**kw)
+
 
 class IntegerField(Field):
 	"""docstring for IntegerField"""
@@ -54,7 +63,8 @@ class FloatField(Field):
 		if not 'ddl' in kw:
 			kw['ddl'] = 'real'
 		super(FloatField, self).__init__(**kw)
-		
+
+
 class BooleanField(Field):
 	def __init__(self, **kw):
 		if not 'default' in kw:
@@ -62,6 +72,7 @@ class BooleanField(Field):
 		if not 'ddl' in kw:
 			kw['ddl'] = 'bool'
 		super(BooleanField, self).__init__(**kw)
+
 
 class TextField(Field):
 	def __init__(self, **kw):
@@ -71,6 +82,7 @@ class TextField(Field):
 			kw['ddl'] = 'text'
 		super(TextField, self).__init__(**kw)
 
+
 class BlobField(Field):
 	def __init__(self, **kw):
 		if not 'default' in kw:
@@ -79,60 +91,73 @@ class BlobField(Field):
 			kw['ddl'] = 'blob'
 		super(BlobField, self).__init__(**kw)
 
+
 class VersionField(Field):
-	def __init__(self,name=None):
-		super(VersionField,self).__init__(name= name,default= 0,ddl= 'bigint')
+	def __init__(self, name=None):
+		super(VersionField, self).__init__(name=name, default=0, ddl='bigint')
 
-_triggers = frozenset(['pre_insert','pre_update','pre_delete'])
 
-def _gen_sql(table_name,mappings):
+_triggers = frozenset(['pre_insert', 'pre_update', 'pre_delete'])
+
+
+def _gen_sql(table_name, mappings):
 	pk = None
-	sql = ['-- generating sql for %s:' % table_name,'create table `%s`(' % table_name]
+	sql = ['-- generating sql for %s:' % table_name, 'create table `%s`(' % table_name]
 	"""
 	sorted(可迭代对象，比较函数大于返回1，小于返回-1，等于0)
 	"""
-	for f in sorted(mappings.values(),lambda x,y:cmp(x._order,y._order)):
-		if not hasattr(f,'ddl'):
+	for f in sorted(mappings.values(), lambda x, y: cmp(x._order, y._order)):
+		if not hasattr(f, 'ddl'):
 			raise StandardError('no ddl in field "%s".' % f)
 		ddl = f.ddl
 		nullable = f.nullable
 		if f.primary_key:
 			pk = f.name
-		sql.append(nullable and ' `%s` %s,'% (f.name,ddl) or ' `%s` %s not null,' % (f.name,ddl))
+		sql.append(nullable and ' `%s` %s,' % (f.name, ddl) or ' `%s` %s not null,' % (f.name, ddl))
 	sql.append(' primary key(`%s`)' % pk)
 	sql.append(');')
 	return '\n'.join(sql)
+
+
 class ModelMetaclass(type):
 	"""docstring for ModelMetaclass"""
-	def __new__(cls,name,bases,attrs):
-		if name == 'Model':#如果Model则不需要做映射
-			return type.__new__(cls,name,bases,attrs)
-		if not hasattr(cls,'subclasses'):#cls指当前类，这里指ModelMetaclass,这四句话的意思是将派生类的名字放在subclasses的变量里面，防止重复定义
+	def __new__(cls, name, bases, attrs):
+		if name == 'Model':
+			# 如果Model则不需要做映射
+			return type.__new__(cls, name, bases, attrs)
+		if not hasattr(cls, 'subclasses'):
+			# cls指当前类，这里指ModelMetaclass,这四句话的意思是将派生类的名字放在subclasses的变量里面，防止重复定义
 			cls.subclasses = {}
 		if not name in cls.subclasses:
-			cls.subclasses[name]= name
+			cls.subclasses[name] = name
 		else:
 			logging.warning('redefine class :%s' % name)
 
 		logging.info('scan ormapping %s' % name)
 		mappings = dict()
-		primary_key =None
-		for k,v in attrs.iteritems():#遍历具体表类的所有列属性
-			if isinstance(v,Field):
-				if not v.name:#如果没有提供name则直接用key做列名
+		primary_key = None
+		for k, v in attrs.iteritems():
+			# 遍历具体表类的所有列属性
+			if isinstance(v, Field):
+				if not v.name:
+					# 如果没有提供name则直接用key做列名
 					v.name = k
-				logging.info('Found mapping : %s =>%s' %(k,v))
-				if v.primary_key:#此列是关注字段
-					if primary_key:#已经存在关注字段
+				logging.info('Found mapping : %s =>%s' % (k, v))
+				if v.primary_key:
+					# 此列是关注字段
+					if primary_key:
+						# 已经存在关注字段
 						raise TypeError('cannot define more than 1 primary key in class:%s' % name)
-					if v.updatable:#关注字段不能更新
+					if v.updatable:
+						# 关注字段不能更新
 						logging.warning('NOTE:change primary key to non-updatable')
 						v.updatable = False
-					if v.nullable:#不可为空
+					if v.nullable:
+						# 不可为空
 						logging.warning('NOTE:change primary key to non-nullable')
 						v.nullable = False
-					primary_key =v
-				mappings[k] =v
+					primary_key = v
+				mappings[k] = v
 		if not primary_key:
 			raise TypeError('primary key not defined in class : %s' % name)
 		for k in mappings.iterkeys():
@@ -141,18 +166,16 @@ class ModelMetaclass(type):
 			attrs['__table__'] = name.lower()
 		attrs['__mappings__'] = mappings
 		attrs['__primary_key__'] = primary_key
-		attrs['__sql__'] = lambda self :_gen_sql(attrs['__table__'],mappings)
+		attrs['__sql__'] = lambda self: _gen_sql(attrs['__table__'], mappings)
 		for trigger in _triggers:
 			if not trigger in attrs:
 				attrs[trigger] = None
-		return type.__new__(cls,name,bases,attrs)
+		return type.__new__(cls, name, bases, attrs)
 		
-
-
 
 class Model(dict):
 	'''
-	__metaclass__ 元类 ，会调用ModelMetaClass.__new__(类变量，类的名字，父类集合，类的方法集合)
+	__metaclass__ 元类 ，会调用ModelMetaClass.__new__(类变量，类的名字，父类集合，类的属性集合)
 	
 	>>>class User(Model):
 	...	id = IntegerField(primary_key=True)
@@ -200,82 +223,93 @@ class Model(dict):
 	'''
 
 	__metaclass__ = ModelMetaclass
-	def __init__(self,**kw):
-		super(Model,self).__init__(**kw)
-	def __getattr__(self,key):
+
+	def __init__(self, **kw):
+		super(Model, self).__init__(**kw)
+
+	def __getattr__(self, key):
 		try:
 			return self[key]
 		except KeyError:
 			raise AttributeError(r"'Dict' object has no attribute '%s'" % key)
-	def __setattr__(self,key,value):
-		self[key]=value
-	#classmethod 类方法 通过类名.方法名调用，首个参数是类变量
-	@classmethod
-	def get(cls,pk):
-		d=db.select_one('select * from %s where %s=?'%(cls.__table__,cls.__primary_key__.name),pk)
-		return cls(**d) if d else None #cls() 和类名()同义
+
+	def __setattr__(self, key, value):
+		self[key] = value
+	# classmethod 类方法 通过类名.方法名调用，首个参数是类变量
 
 	@classmethod
-	def find_first(cls,where,*args):
-		d=db.select_one('select * from %s %s'% (cls.__table__,where),*args)
+	def get(cls, pk):
+		d = db.select_one('select * from %s where %s=?' % (cls.__table__, cls.__primary_key__.name), pk)
+		return cls(**d) if d else None
+	# cls() 和类名()同义 相当于返回一个表类的实例，并且赋值过
+
+	@classmethod
+	def find_first(cls, where, *args):
+		d = db.select_one('select * from %s %s' % (cls.__table__, where), *args)
 		return cls(**d) if d else None
 
 	@classmethod
-	def find_all(cls,*args):
-		L=db.select('select * from `%s`' %cls.__table__)
-		return [cls(**d) for d in L] #list生成器
+	def find_all(cls, *args):
+		L = db.select('select * from `%s`' % cls.__table__)
+		return [cls(**d) for d in L]
+	# list生成器
 
 	@classmethod
-	def find_by(cls,where,*args):
-		L=db.select('select * from `%s` %s' %(cls.__table__,where),*args)
+	def find_by(cls, where, *args):
+		L = db.select('select * from `%s` %s' % (cls.__table__, where), *args)
 		return [cls(**d) for d in L]
 
 	@classmethod
 	def count_all(cls):
-		return db.select_int('select count(`%s`) from `%s`' %(cls.__primary_key__.name,cls.__table__))
+		return db.select_int('select count(`%s`) from `%s`' % (cls.__primary_key__.name,cls.__table__))
 
 	@classmethod
-	def count_by(cls,where,*args):
-		return db.select_int('select count(`%s`) from `%s` %s'% (cls.__primary_key__.name,cls.__table__,where),*args)
+	def count_by(cls, where, *args):
+		return db.select_int('select count(`%s`) from `%s` %s'% (cls.__primary_key__.name, cls.__table__, where), *args)
 
-	def update(self):#实例方法 通过类方法生成实例后，可以对实例进行操作
-		self.pre_update and self.pre_update()#如果存在pre_update这类自定义函数就执行
-		L=[]
-		args=[]
-		for k,v in self.__mappings__.iteritems():#遍历表的所有列，该列可update的情况下如果实例中存在值则取值不存在则取默认值
+	def update(self):
+		# 实例方法 通过类方法生成实例后，可以对实例进行操作
+		self.pre_update and self.pre_update()
+		# 如果存在pre_update这类自定义函数就执行
+		L = []
+		args = []
+		for k, v in self.__mappings__.iteritems():
+			# 遍历表的所有列，该列可update的情况下如果实例中存在值则取值不存在则取默认值
 			if v.updatable:
-				if hasattr(self,k):
-					arg=getattr(self,k)
+				if hasattr(self, k):
+					arg=getattr(self, k)
 				else:
 					arg = v.default
-					setattr(self,k,arg)
-				L.append('`%s`=?'%k)
+					setattr(self, k, arg)
+				L.append('`%s`=?' % k)
 				args.append(arg)
 		pk = self.__primary_key__.name
-		args.append(getattr(self,pk))
+		args.append(getattr(self, pk))
 		db.update('update `%s` set %s where %s = ?' % (self.__table__, ','.join(L),pk),*args)
 		return self
+
 	def delete(self):
 		self.pre_delete and self.pre_delete()
 		pk = self.__primary_key__.name
-		args = (getattr(self,pk),)
-		db.update('delete from `%s` where `%s`= ?' % (self.__table__,pk),*args)
+		args = (getattr(self, pk),)
+		db.update('delete from `%s` where `%s`= ?' % (self.__table__, pk), *args)
 		return self
+
 	def insert(self):
 		self.pre_insert and self.pre_insert()
-		params ={}
-		for k,v in self.__mappings__.iteritems():
+		params = {}
+		for k, v in self.__mappings__.iteritems():
 			if v.insertable:
-				if not hasattr(self,k):
-					setattr(self,k,v.default)
-				params[v.name] = getattr(self,k)
-		db.insert('%s' % self.__table__,**params)
+				if not hasattr(self, k):
+					setattr(self, k, v.default)
+				params[v.name] = getattr(self, k)
+		db.insert('%s' % self.__table__, **params)
 		return self
 
 
 if __name__ == '__main__':
 	logging.basicConfig(lecel=logging.DEBUG)
-	db.create_engine('root','password','mypython','127.0.0.1')
+	db.create_engine('root', '123456', 'mypython', '127.0.0.1')
 	db.update('drop table if exists user')
 	db.update('create table user (id int primary key,name text,email text,passwd text,last_modified real)')
 	import doctest
