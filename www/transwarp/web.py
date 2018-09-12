@@ -29,7 +29,7 @@ class Dict(dict):
 		self[key] = value
 
 
-_TIMEDELTA_ZERO = datetime.timedelta(0)
+_TIMEDELTA_ZERO = datetime.timedelta(0)  # timedelta表示时间间隔
 _RE_TZ = re.compile('^([\+\-])([0-9]{1,2})\:([0-9]{1,2})$')
 
 
@@ -197,7 +197,7 @@ class RedirectError(HttpError):
 		self.location = location
 
 	def __str__(self):
-		return '%s,%s' % (self.status,self.location)
+		return '%s,%s' % (self.status, self.location)
 
 	__repr__ = __str__
 
@@ -227,15 +227,15 @@ def internalerror():
 
 
 def redirect(location):
-	return RedirectError(301,location)
+	return RedirectError(301, location)
 
 
 def found(location):
-	return RedirectError(302,location)
+	return RedirectError(302, location)
 
 
 def seeother(location):
-	return RedirectError(303,location)
+	return RedirectError(303, location)
 	
 
 def _to_str(s):
@@ -253,14 +253,14 @@ def _to_unicode(s, encoding='utf-8'):
 def _quote(s, encoding='utf-8'):
 	if isinstance(s, unicode):
 		s = s.encode(encoding)
-	return urllib.quote(s)
+	return urllib.quote(s)  # 将url编码为浏览器可识别的
 
 
 def _unquote(s, encoding='utf-8'):
-	return urllib.unquote(s).decode(encoding)
+	return urllib.unquote(s).decode(encoding)  # 和quote相反
 
 
-def get(path):
+def get(path):  # 给处理函数添加两个方法属性
 	def _decorator(func):
 		func.__web_route__ = path
 		func.__web_method__ = 'GET'
@@ -283,19 +283,19 @@ def _build_regex(path):
 	re_list = ['^']
 	var_list = []
 	is_var = False
-	for v in _re_route.split(path):
+	for v in _re_route.split(path):  # 注意如果正则用括号括起来 ，那么匹配的字符串也会被放进list
 		if is_var:
 			var_name = v[1:]
 			var_list.append(var_name)
-			re_list.append(r'(?P<%s>[^\/]+)' % var_name)
+			re_list.append(r'(?P<%s>[^\/]+)' % var_name)  # (?P<%s>[^\/]+)这是python正则的语法糖 意思就是匹配[^\/]+ 赋予%s的组名,可以通过组名索引
 		else:
 			s = ''
 			for ch in v:
 				if '0' <= ch <= '9':
 					s = s + ch
-				elif ch>='A' and ch<='Z':
+				elif 'A' <= ch <= 'Z':
 					s = s + ch
-				elif ch>='a' and ch<='z':
+				elif 'a' <= ch <= 'z':
 					s = s + ch
 				else:
 					s = s + '\\' + ch
@@ -325,8 +325,8 @@ class Route(object):
 
 	def __str__(self):
 		if self.is_static:
-			return 'Route(static,%s,path=%s)'% (self.method,self.path)
-		return 'Route(dynamic.%s,path=%s)' % (self.method,self.path)
+			return 'Route(static,%s,path=%s)' % (self.method, self.path)
+		return 'Route(dynamic.%s,path=%s)' % (self.method, self.path)
 
 	__repr__ = __str__
 
@@ -352,11 +352,11 @@ class StaticFileRoute(object):
 		return None
 
 	def __call__(self, *args):
-		fpath = os.path.join(ctx.application.document_root,args[0])
+		fpath = os.path.join(ctx.application.document_root, args[0])
 		if not os.path.isfile(fpath):
 			raise notfound()
 		fext = os.path.splitext(fpath)[1]
-		ctx.response.content_type = mimetypes.types_map.get(fext.lower(),'application/octet-stream')
+		ctx.response.content_type = mimetypes.types_map.get(fext.lower(), 'application/octet-stream')
 		return _static_file_generator(fpath)
 
 
@@ -382,7 +382,7 @@ class Request(object):
 			if item.filename:
 				return MultipartFile(item)
 			return _to_unicode(item.value)
-		fs = cgi.FieldStorage(fp=self._environ['wsgi.input'],environ = self._environ,keep_blank_values =True)
+		fs = cgi.FieldStorage(fp=self._environ['wsgi.input'], environ=self._environ, keep_blank_values=True)
 		inputs = dict()
 		for key in fs:
 			inputs[key] = _convert(fs[key])
@@ -393,7 +393,7 @@ class Request(object):
 			self._raw_input = self._parse_input()
 		return self._raw_input
 
-	def __getitem__(self,key):
+	def __getitem__(self, key):
 		r = self._get_raw_input()[key]
 		if isinstance(r, list):
 			return r[0]
@@ -444,18 +444,18 @@ class Request(object):
 
 	@property
 	def path_info(self):
-		return urllib.unquote(self._environ.get('PATH_INFO',''))
+		return urllib.unquote(self._environ.get('PATH_INFO', ''))
 
 	@property
 	def host(self):
-		return self._environ.get('HTTP_HOST','')
+		return self._environ.get('HTTP_HOST', '')
 
 	def _get_headers(self):
-		if not hasattr(self,'_headers'):
+		if not hasattr(self, '_headers'):
 			hdrs = {}
 			for k,v in self._environ.iteritems():
 				if k.startswith('HTTP_'):
-					hdrs[k[5:].replace('_','-').upper()] = v.decode('utf-8')
+					hdrs[k[5:].replace('_', '-').upper()] = v.decode('utf-8')
 			self._headers = hdrs
 		return self._headers
 
@@ -463,27 +463,27 @@ class Request(object):
 	def headers(self):
 		return dict(**self._get_headers())
 
-	def header(self,header,default=None):
-		return self._get_headers().get(header.upper(),default)
+	def header(self, header, default=None):
+		return self._get_headers().get(header.upper(), default)
 
 	def _get_cookies(self):
-		if not hasattr(self,'_cookies'):
+		if not hasattr(self, '_cookies'):
 			cookies = {}
 			cookies_str = self._environ.get('HTTP_COOKIE')
 			if cookies_str:
 				for c in cookies_str.split(';'):
 					pos = c.find('=')
-					if pos>0:
+					if pos > 0:
 						cookies[c[:pos].strip()] = _unquote(c[pos+1:])
-			self._cookies =cookies
+			self._cookies = cookies
 		return self._cookies
 
 	@property
 	def cookies(self):
 		return Dict(**self._get_cookies())
 
-	def cookie(self,name,default=None):
-		return self._get_cookies().get(name,default)
+	def cookie(self, name, default=None):
+		return self._get_cookies().get(name, default)
 
 
 UTC_0 = UTC('+00:00')
@@ -550,8 +550,8 @@ class Respense(object):
 		L = ['%s=%s' % (_quote(name),_quote(value))]
 		if expires is not None:
 			if isinstance(expires, (float, int, long)):
-				L.append('Expires=%s' % datetime.datetime.fromtimestamp(expires,UTC_0).strftime('%a,%d-%b-%Y %H:%M:%S GMT'))
-			if isinstance(expires,(datetime.date,datetime.datetime)):
+				L.append('Expires=%s' % datetime.datetime.fromtimestamp(expires, UTC_0).strftime('%a,%d-%b-%Y %H:%M:%S GMT'))
+			if isinstance(expires,(datetime.date, datetime.datetime)):
 				L.append('Expires=%s' % expires.astimezone(UTC_0).strftime('%a,%d-%b-%Y %H:%M:%S GMT'))
 		elif isinstance(max_age, (int, long)):
 			L.append('Max-Age=%d' % max_age)
@@ -564,8 +564,8 @@ class Respense(object):
 			L.append('HttpOnly')
 		self._cookies[name] = '; '.join(L)
 
-	def unset_cookie(self,name):
-		if hasattr(self,'_cookies'):
+	def unset_cookie(self, name):
+		if hasattr(self, '_cookies'):
 			if name in self._cookies:
 				del self._cookies[name]
 
@@ -579,45 +579,50 @@ class Respense(object):
 
 	@status.setter
 	def status(self,value):
-		if isinstance(value,(int,long)):
+		if isinstance(value, (int, long)):
 			if value>=100 and value<=999:
-				st = _RESPONSE_STATUSES.get(value,'')
+				st = _RESPONSE_STATUSES.get(value, '')
 				if st:
-					self._status='%d %s' % (value,st)
+					self._status = '%d %s' % (value, st)
 				else:
 					self._status = str(value)
 			else:
 				raise ValueError('Bad response code :%d' % value)
-		elif isinstance(value,basestring):
-			if isinstance(value,unicode):
+		elif isinstance(value, basestring):
+			if isinstance(value, unicode):
 				value = value.encode('utf-8')
 			if _RE_RESPONSE_STATUS.match(value):
 				self._status = value
 			else:
-				raise ValueError('Bad response code:%s'  % value)
+				raise ValueError('Bad response code:%s' % value)
 		else:
 			raise TypeError('Bad type of response code')
 
+
 class Template(object):
-	def __init__(self,template_name,**kw):
+	def __init__(self, template_name, **kw):
 		self.template_name = template_name
 		self.model = dict(**kw)
 
+
 class TemplateEngine(object):
-	def __call__(self,path,model):
+	def __call__(self, path, model):
 		return '<!-- override this method to render template -->'
 
-class Jinja2TemplateEngine(TemplateEngine):
-	def __init__(self,templ_dir,**kw):
-		from jinja2 import Environment,FileSystemLoader
-		if not 'autoescape' in kw:
+
+class Jinja2TemplateEngine(TemplateEngine):  # 引入jinja模板
+	def __init__(self, templ_dir, **kw):
+		from jinja2 import Environment, FileSystemLoader
+		if 'autoescape' not in kw:
 			kw['autoescape'] = True
-		self._env = Environment(loader=FileSystemLoader(templ_dir),**kw)
-	def add_filter(self,name,fn_filter):
+		self._env = Environment(loader=FileSystemLoader(templ_dir), **kw)
+
+	def add_filter(self, name, fn_filter):
 		self._env.filters[name] = fn_filter
 
-	def __call__(self,path,model):
+	def __call__(self, path, model):
 		return self._env.get_template(path).render(**model).encode('utf-8')
+
 
 def _default_error_handler(e,start_response,is_debug):
 	if isinstance(e,HttpError):
@@ -679,18 +684,19 @@ def _bulid_interceptor_chain(last_fn,*interceptors):
 		fn = _bulid_interceptor_fn(f,fn)
 	return fn
 
+
 def _load_module(module_name):
 	last_dot = module_name.rfind('.')
-	if last_dot ==(-1):
-		return __import__(module_name,globals(),locals())
+	if last_dot == (-1):
+		return __import__(module_name, globals(), locals())
 	from_module = module_name[:last_dot]
 	import_module = module_name[last_dot+1:]
-	m = __import__(from_module,globals(),locals(),[import_module])
-	return getattr(m,import_module)
+	m = __import__(from_module, globals(), locals(), [import_module])
+	return getattr(m, import_module)
 
 
 class WSGIApplication(object):
-	def __init__(self,document_root=None,**kw):
+	def __init__(self, document_root=None, **kw):
 		self._running = False
 		self._document_root = document_root
 
@@ -712,24 +718,24 @@ class WSGIApplication(object):
 		return self._template_engine
 
 	@template_engine.setter
-	def template_engine(self,engine):
+	def template_engine(self, engine):
 		self._check_not_running()
 		self._template_engine = engine
 
-	def add_module(self,mod):
+	def add_module(self, mod):
 		self._check_not_running()
-		m = mod if type(mod)==types.ModuleType else _load_module(mod)
+		m = mod if type(mod) == types.ModuleType else _load_module(mod)
 		logging.info('Add module:%s' % m.__name__)
-		for name in dir(m):
-			fn = getattr(m,name)
-			if callable(fn) and hasattr(fn,'__web_route__') and hasattr(fn,'__web_method__'):
+		for name in dir(m):  # 遍历urls模板中的方法
+			fn = getattr(m, name)
+			if callable(fn) and hasattr(fn, '__web_route__') and hasattr(fn, '__web_method__'):
 				self.add_url(fn)
 	
-	def add_url(self,func):
+	def add_url(self, func):
 		self._check_not_running()
 		route = Route(func)
 		if route.is_static:
-			if route.method =='GET':
+			if route.method == 'GET':
 				self._get_static[route.path] = route
 			if route.method == 'POST':
 				self._post_static[route.path] = route
@@ -740,18 +746,18 @@ class WSGIApplication(object):
 				self._post_dynamic.append(route)
 		logging.info('Add route :%s' % str(route))
 
-	def add_interceptor(self,func):
+	def add_interceptor(self, func):
 		self._check_not_running()
 		self._interceptors.append(func)
 		logging.info('Add interceptors: %s' % str(func))
 
-	def run(self,port=9000,host='127.0.0.1'):
+	def run(self, port=9000, host='127.0.0.1'):
 		from wsgiref.simple_server import make_server
-		logging.info('application (%s) will start at %s:%s...' % (self._document_root,host,port))
-		server = make_server(host,port,self.get_wsgi_application(debug=True))
+		logging.info('application (%s) will start at %s:%s...' % (self._document_root, host, port))
+		server = make_server(host, port, self.get_wsgi_application(debug=True))
 		server.server_forever()
 	
-	def get_wsgi_application(self,debug=False):
+	def get_wsgi_application(self, debug=False):
 		self._check_not_running()
 		if debug:
 			self._get_dynamic.append(StaticFileRoute())
@@ -763,7 +769,7 @@ class WSGIApplication(object):
 			request_method = ctx.request.request_method
 			path_info = ctx.request.path_info
 			if request_method == 'GET':
-				fn =  self._get_static.get(path_info,None)
+				fn = self._get_static.get(path_info, None)
 				if fn:
 					return fn()
 				for fn in self._get_dynamic:
@@ -772,7 +778,7 @@ class WSGIApplication(object):
 						return fn(*args)
 				raise notfound()
 			if request_method == 'POST':
-				fn = self._post_static.get(path_info,None)
+				fn = self._post_static.get(path_info, None)
 				if fn:
 					return fn()
 				for fn in self._post_dynamic:
@@ -782,9 +788,9 @@ class WSGIApplication(object):
 				raise notfound()
 			raise badrequest()
 
-		fn_exec = _bulid_interceptor_chain(fn_route,*self._interceptors)
+		fn_exec = _bulid_interceptor_chain(fn_route, *self._interceptors)
 
-		def wsgi(env,start_response):
+		def wsgi(env, start_response):
 			ctx.application = _application
 			ctx.request = Request(env)
 			response = ctx.Respense = Respense()
@@ -828,8 +834,7 @@ class WSGIApplication(object):
 
 if __name__ == '__main__':
 	sys.path.append('.')
-	import doctest
-	doctest.testmod()
+	print _build_regex('/:user/:comments/list')
 	
 			
 
