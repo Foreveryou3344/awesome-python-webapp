@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-__author__ = 'fangyu'
+__author__ = 'ForYou'
 
 import types,os,re,cgi,sys,time,datetime,functools,mimetypes,threading,logging,urllib,traceback
 
@@ -12,27 +12,29 @@ except ImportError:
 
 ctx = threading.local()
 
+
 class Dict(dict):
-	def __init__(self,names=(),values=(),**kw):
-		super(Dict,self).__init__(**kw)
-		for k,v in zip(names,values):
+	def __init__(self, names=(), values=(), **kw):
+		super(Dict, self).__init__(**kw)
+		for k, v in zip(names, values):
 			self[k] = v
 
-	def __getattr__(self,key):
+	def __getattr__(self, key):
 		try:
 			return self[key]
 		except KeyError:
 			raise AttributeError(r"'Dict' object has no Attribute '%s'" % key)
 
-	def __setattr__(self,key,value):
+	def __setattr__(self, key, value):
 		self[key] = value
 
-_TIMEDELTA_ZERO = datetime.timedelta(0)
 
+_TIMEDELTA_ZERO = datetime.timedelta(0)
 _RE_TZ = re.compile('^([\+\-])([0-9]{1,2})\:([0-9]{1,2})$')
 
+
 class UTC(datetime.tzinfo):
-	def __init__(self,utc):
+	def __init__(self, utc):
 		utc = str(utc.strip().upper())
 		mt = _RE_TZ.match(utc)
 		if mt:
@@ -40,25 +42,26 @@ class UTC(datetime.tzinfo):
 			h = int(mt.group(2))
 			m = int(mt.group(3))
 			if minus:
-				h,m = (-h),(-m)
-			self._utcoffset = datetime.timedelta(hours=h,minutes=m)
+				h, m = (-h), (-m)
+			self._utcoffset = datetime.timedelta(hours=h, minutes=m)
 			self._tzname = 'UTC%s' % utc
 		else:
 			raise ValueError('bad utc time zone')
 
-	def utcoffset(self,dt):
+	def utcoffset(self, dt):
 		return self._utcoffset
 
-	def dst(self,dt):
+	def dst(self, dt):
 		return _TIMEDELTA_ZERO
 
-	def tzname(self,dt):
+	def tzname(self, dt):
 		return self._tzname
 
 	def __str__(self):
 		return 'UTC tzinfo object (%s)' % self._tzname
 
 	__repr__ = __str__
+
 
 _RESPONSE_STATUSES = {
 	# Informational
@@ -161,23 +164,24 @@ _RESPONSE_HEADERS = (
 	'X-UA-Compatible',
 )
 
-_RESPONSE_HEADER_DICT = dict(zip(map(lambda x: x.upper(),_RESPONSE_HEADERS),_RESPONSE_HEADERS))
+_RESPONSE_HEADER_DICT = dict(zip(map(lambda x: x.upper(), _RESPONSE_HEADERS), _RESPONSE_HEADERS))
 
-_HEADER_X_POWERED_BY = ('X-Powered-By','transwarp/1.0')
+_HEADER_X_POWERED_BY = ('X-Powered-By', 'transwarp/1.0')
+
 
 class HttpError(Exception):
-	def __init__(self,code):
-		super(HttpError,self).__init__()
-		self.status = '%d %s' % (code,_RESPONSE_STATUSES[code])
+	def __init__(self, code):
+		super(HttpError, self).__init__()
+		self.status = '%d %s' % (code, _RESPONSE_STATUSES[code])
 
-	def header(self,name,value):
-		if not hasattr(self,'_headers'):
+	def header(self, name, value):
+		if not hasattr(self, '_headers'):
 			self._headers = [_HEADER_X_POWERED_BY]
-		self._headers.append((name,value))
+		self._headers.append((name, value))
 
 	@property
 	def headers(self):
-		if hasattr(self,'_headers'):
+		if hasattr(self, '_headers'):
 			return self._headers
 		return []
 
@@ -186,9 +190,10 @@ class HttpError(Exception):
 
 	__repr__ = __str__
 
+
 class RedirectError(HttpError):
-	def __init__(self,code,location):
-		super(RedirectError,self).__init__(code)
+	def __init__(self, code, location):
+		super(RedirectError, self).__init__(code)
 		self.location = location
 
 	def __str__(self):
@@ -196,51 +201,64 @@ class RedirectError(HttpError):
 
 	__repr__ = __str__
 
+
 def badrequest():
 	return HttpError(400)
+
 
 def unauthorized():
 	return HttpError(401)
 
+
 def forbidden():
 	return HttpError(403)
+
 
 def notfound():
 	return HttpError(404)
 
+
 def conflict():
 	return HttpError(409)
+
 
 def internalerror():
 	return HttpError(500)
 
+
 def redirect(location):
 	return RedirectError(301,location)
 
+
 def found(location):
 	return RedirectError(302,location)
+
 
 def seeother(location):
 	return RedirectError(303,location)
 	
 
 def _to_str(s):
-	if isinstance(s,str):
+	if isinstance(s, str):
 		return s
-	if isinstance(s,unicode):
+	if isinstance(s, unicode):
 		return s.encode('utf-8')
 	return str(s)
 
-def _to_unicode(s,encoding='utf-8'):
-	return s.decode('utf-8')
 
-def _quote(s,encoding='utf-8'):
-	if isinstance(s,unicode):
-		s= s.encode(encoding)
+def _to_unicode(s, encoding='utf-8'):
+	return s.decode(encoding)
+
+
+def _quote(s, encoding='utf-8'):
+	if isinstance(s, unicode):
+		s = s.encode(encoding)
 	return urllib.quote(s)
 
-def _unquote(s,encoding='utf-8'):
+
+def _unquote(s, encoding='utf-8'):
 	return urllib.unquote(s).decode(encoding)
+
 
 def get(path):
 	def _decorator(func):
@@ -249,6 +267,7 @@ def get(path):
 		return func
 	return _decorator
 
+
 def post(path):
 	def _decorator(func):
 		func.__web_route__ = path
@@ -256,7 +275,9 @@ def post(path):
 		return func
 	return _decorator
 
+
 _re_route = re.compile(r'(\:[a-zA-Z_]\w*)')
+
 
 def _build_regex(path):
 	re_list = ['^']
@@ -270,7 +291,7 @@ def _build_regex(path):
 		else:
 			s = ''
 			for ch in v:
-				if ch>='0' and ch<='9':
+				if '0' <= ch <= '9':
 					s = s + ch
 				elif ch>='A' and ch<='Z':
 					s = s + ch
@@ -283,8 +304,9 @@ def _build_regex(path):
 	re_list.append('$')
 	return ''.join(re_list)
 
+
 class Route(object):
-	def __init__(self,func):
+	def __init__(self, func):
 		self.path = func.__web_route__
 		self.method = func.__web_method__
 		self.is_static = _re_route.search(self.path) is None
@@ -292,13 +314,13 @@ class Route(object):
 			self.route = re.compile(_build_regex(self.path))
 		self.func = func
 
-	def match(self,url):
+	def match(self, url):
 		m = self.route.match(url)
 		if m:
 			return m.groups()
 		return None
 
-	def __call__(self,*args):
+	def __call__(self, *args):
 		return self.func(*args)
 
 	def __str__(self):
@@ -308,13 +330,15 @@ class Route(object):
 
 	__repr__ = __str__
 
+
 def _static_file_generator(fpath):
 	BLOCK_SIZE = 8192
-	with open(fpath,'rb') as f:
+	with open(fpath, 'rb') as f:
 		block = f.read(BLOCK_SIZE)
 		while block:
 			yield block
 			block = f.read(BLOCK_SIZE)
+
 
 class StaticFileRoute(object):
 	def __init__(self):
@@ -322,11 +346,12 @@ class StaticFileRoute(object):
 		self.is_static = False
 		self.route = re.compile('^/static/(.+)$')
 
-	def match(self,url):
+	def match(self, url):
 		if url.startswith('/static/'):
-			return (url[1:],)
+			return (url[1:], )
 		return None
-	def __call__(self,*args):
+
+	def __call__(self, *args):
 		fpath = os.path.join(ctx.application.document_root,args[0])
 		if not os.path.isfile(fpath):
 			raise notfound()
@@ -334,21 +359,25 @@ class StaticFileRoute(object):
 		ctx.response.content_type = mimetypes.types_map.get(fext.lower(),'application/octet-stream')
 		return _static_file_generator(fpath)
 
+
 def favicon_handler():
-	return static_file_handler('/favicon.ico')
+	pass
+	# return static_file_handler('/favicon.ico')
+
 
 class MultipartFile(object):
-	def __init__(self,storage):
+	def __init__(self, storage):
 		self.filename = _to_unicode(storage.filename)
 		self.file = storage.file
 
+
 class Request(object):
-	def __init__(self,environ):
+	def __init__(self, environ):
 		self._environ = environ
 
 	def _parse_input(self):
 		def _convert(item):
-			if isinstance(item,list):
+			if isinstance(item, list):
 				return [_to_unicode(i.value) for i in item]
 			if item.filename:
 				return MultipartFile(item)
@@ -360,33 +389,33 @@ class Request(object):
 		return inputs
 
 	def _get_raw_input(self):
-		if not hasattr(self,'_raw_input'):
+		if not hasattr(self, '_raw_input'):
 			self._raw_input = self._parse_input()
 		return self._raw_input
 
 	def __getitem__(self,key):
 		r = self._get_raw_input()[key]
-		if isinstance(r,list):
+		if isinstance(r, list):
 			return r[0]
 		return r
 
-	def get(self,key,default=None):
-		r = self._get_raw_input().get(key,default)
-		if isinstance(r,list):
+	def get(self, key, default=None):
+		r = self._get_raw_input().get(key, default)
+		if isinstance(r, list):
 			return r[0]
 		return r
 
 	def gets(self,key):
 		r = self._get_raw_input()[key]
-		if isinstance(r,list):
+		if isinstance(r, list):
 			return r[:]
 		return [r]
 
-	def input(self,**kw):
+	def input(self, **kw):
 		copy = Dict(**kw)
 		raw = self._get_raw_input()
-		for k,v in raw.iteritems():
-			copy[k] = v[0] if isinstance(v,list) else v
+		for k, v in raw.iteritems():
+			copy[k] = v[0] if isinstance(v, list) else v
 		return copy
 
 	def get_body(self):
@@ -395,15 +424,15 @@ class Request(object):
 
 	@property
 	def remote_addr(self):
-		return self._environ.get('REMOTE_ADDR','0.0.0.0')
+		return self._environ.get('REMOTE_ADDR', '0.0.0.0')
 
 	@property
 	def document_root(self):
-		return self._environ.get('DOCUMENT_ROOT','')
+		return self._environ.get('DOCUMENT_ROOT', '')
 
 	@property
 	def query_string(self):
-		return self._environ.get('QUERY_STRING','')
+		return self._environ.get('QUERY_STRING', '')
 
 	@property
 	def environ(self):
@@ -441,8 +470,8 @@ class Request(object):
 		if not hasattr(self,'_cookies'):
 			cookies = {}
 			cookies_str = self._environ.get('HTTP_COOKIE')
-			if cookie_str:
-				for c in cookie_str.split(';'):
+			if cookies_str:
+				for c in cookies_str.split(';'):
 					pos = c.find('=')
 					if pos>0:
 						cookies[c[:pos].strip()] = _unquote(c[pos+1:])
@@ -456,36 +485,38 @@ class Request(object):
 	def cookie(self,name,default=None):
 		return self._get_cookies().get(name,default)
 
+
 UTC_0 = UTC('+00:00')
+
 
 class Respense(object):
 	def __init__(self):
 		self._status = '200 OK'
-		self._headers = {'CONTENT-TYPE':'text/html; charset=utf-8'}
+		self._headers = {'CONTENT-TYPE': 'text/html; charset=utf-8'}
 
 	@property
 	def headers(self):
-		L = [(_RESPONSE_HEADER_DICT.get(k,k),v) for k,v in self._headers.iteritems()]
-		if hasattr(self,'_cookies'):
+		L = [(_RESPONSE_HEADER_DICT.get(k, k), v) for k, v in self._headers.iteritems()]
+		if hasattr(self, '_cookies'):
 			for v in self._cookies.itervalues():
-				L.append(('Set-Cookie',v))
+				L.append(('Set-Cookie', v))
 		L.append(_HEADER_X_POWERED_BY)
 		return L
 
-	def header(self,name):
+	def header(self, name):
 		key = name.upper()
 		if not key in _RESPONSE_HEADER_DICT:
 			key = name
 		return self._headers.get(key)
 
-	def unset_header(self,name):
+	def unset_header(self, name):
 		key = name.upper()
 		if not key in _RESPONSE_HEADER_DICT:
 			key = name
 		if key in self._headers:
 			del self._headers[key]
 
-	def set_header(self,name,value):
+	def set_header(self, name, value):
 		key = name.upper()
 		if not key in _RESPONSE_HEADER_DICT:
 			key = name
@@ -496,9 +527,9 @@ class Respense(object):
 		return self.header('CONTENT-TYPE')
 
 	@content_type.setter
-	def content_type(self,value):
+	def content_type(self, value):
 		if value:
-			self.set_header('CONTENT-TYPE',value)
+			self.set_header('CONTENT-TYPE', value)
 		else:
 			self.unset_header('CONTENT-TYPE')
 
@@ -507,22 +538,22 @@ class Respense(object):
 		return self.header('CONTENT-LENGTH')
 
 	@content_length.setter
-	def content_length(self,value):
-		self.set_header('CONTENT-LENGTH',str(value))
+	def content_length(self, value):
+		self.set_header('CONTENT-LENGTH', str(value))
 	
-	def delete_cookie(self,name):
-		self.set_cookie(name,'__deleted__',expires=0)
+	def delete_cookie(self, name):
+		self.set_cookie(name, '__deleted__', expires=0)
 	
-	def set_cookie(self,name,value,max_age=None,expires=None,path='/',domain=None,secure=False,http_only=True):
+	def set_cookie(self, name, value, max_age=None, expires=None, path='/', domain=None, secure=False, http_only=True):
 		if not hasattr(self,'_cookies'):
 			self._cookies = {}
 		L = ['%s=%s' % (_quote(name),_quote(value))]
 		if expires is not None:
-			if isinstance(expires,(float,int,long)):
+			if isinstance(expires, (float, int, long)):
 				L.append('Expires=%s' % datetime.datetime.fromtimestamp(expires,UTC_0).strftime('%a,%d-%b-%Y %H:%M:%S GMT'))
 			if isinstance(expires,(datetime.date,datetime.datetime)):
 				L.append('Expires=%s' % expires.astimezone(UTC_0).strftime('%a,%d-%b-%Y %H:%M:%S GMT'))
-		elif isinstance(max_age,(int,long)):
+		elif isinstance(max_age, (int, long)):
 			L.append('Max-Age=%d' % max_age)
 		L.append('Path=%s' % path)
 		if domain:
@@ -598,7 +629,8 @@ def _default_error_handler(e,start_response,is_debug):
 	logging.exception('Exception:')
 	start_response('500 Internal Server Error',[('Content-Type','text/html'),_HEADER_X_POWERED_BY])
 	if is_debug:
-		return _debug()
+		pass
+		# return _debug()
 	return ('<html><body><h1>500 Internal Server Error</h1><h3>%s</h3></body></html>' % str(e))
 
 def view(path):
@@ -716,7 +748,7 @@ class WSGIApplication(object):
 	def run(self,port=9000,host='127.0.0.1'):
 		from wsgiref.simple_server import make_server
 		logging.info('application (%s) will start at %s:%s...' % (self._document_root,host,port))
-		server = make_server(hsot,port,self.get_wsgi_application(debug=True))
+		server = make_server(host,port,self.get_wsgi_application(debug=True))
 		server.server_forever()
 	
 	def get_wsgi_application(self,debug=False):
