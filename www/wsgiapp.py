@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- coding :utf-8 -*-
+# -*- coding: utf-8 -*-
 
 __author__ = 'ForYou'
 
@@ -13,7 +13,7 @@ from transwarp.web import WSGIApplication, Jinja2TemplateEngine
 from config import configs
 db.create_engine(**configs.db)
 
-wsgi = WSGIApplication(os.path.dirname(os.path.abspath(__file__)))  # 常用搭配返回当前脚本的绝对路径不包含文件名
+wsgi = WSGIApplication(os.path.dirname(os.path.abspath(__file__)))  # 用搭配返回当前脚本的绝对路径不包含文件名
 
 template_engine = Jinja2TemplateEngine(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates'))
 

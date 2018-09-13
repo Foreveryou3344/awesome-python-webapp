@@ -32,7 +32,7 @@ def merge(defaults, override):  # 合并两个配置
 				r[k] = override[k]
 		else:
 			r[k] = v
-		return r
+	return r
 
 
 def toDict(d):  # 转换为可以用.来赋值引用

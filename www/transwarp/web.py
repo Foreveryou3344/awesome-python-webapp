@@ -766,7 +766,7 @@ class WSGIApplication(object):
 		from wsgiref.simple_server import make_server
 		logging.info('application (%s) will start at %s:%s...' % (self._document_root, host, port))
 		server = make_server(host, port, self.get_wsgi_application(debug=True))
-		server.server_forever()
+		server.serve_forever()
 	
 	def get_wsgi_application(self, debug=False):  # 对wsgi方法进行初始化 最后返回一个wsgi方法
 		self._check_not_running()
@@ -804,7 +804,7 @@ class WSGIApplication(object):
 		def wsgi(env, start_response):  # wsgi方法 用来取env 包含http请求的dict 和发送http响应的函数start_response
 			ctx.application = _application
 			ctx.request = Request(env)
-			response = ctx.Respense = Respense()
+			response = ctx.response = Respense()
 			try:
 				r = fn_exec()  # 有拦截器先判断拦截器 没有拦截器就执行urls中对应的方法（根据path 和method判断） 返回MVC中的M
 				if isinstance(r, Template):  # 如果在urls中指定了view 则执行jinja模板
