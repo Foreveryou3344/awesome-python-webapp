@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding :utf-8 -*-
 
-__author__ = 'fangyu'
+__author__ = 'ForYou'
 
 import logging; logging.basicConfig(level=logging.INFO)
 

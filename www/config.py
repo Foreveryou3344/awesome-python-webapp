@@ -22,7 +22,7 @@ class Dict(dict):
 		self[key] = value
 
 
-def merge(defaults, override):
+def merge(defaults, override):  # 合并两个配置
 	r = {}
 	for k, v in defaults.iteritems():
 		if k in override:
@@ -35,7 +35,7 @@ def merge(defaults, override):
 		return r
 
 
-def toDict(d):
+def toDict(d):  # 转换为可以用.来赋值引用
 	D = Dict()
 	for k, v in d.iteritems():
 		D[k] = toDict(v) if isinstance(v, dict) else v
