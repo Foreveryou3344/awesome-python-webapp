@@ -1,6 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+# 核心是WSGIApplication方法 初始化脚本路径 后 可以通过add_module添加自己定义的对应不同url响应的方法到变量中，
+# 也可以通过add_interceptor添加拦截器 提供run方法启动服务 并在get_wsgi_application方法中初始化wsgi响应服务器请求
+# wsgi中会通过Request初始化http请求参数，通过Respense初始化响应数据，
+# 然后执行fn_exec，这个方法中会连接拦截器和自己提供的url响应方法，有拦截器就先判断拦截器，没有则通过fn_route匹配对应的方法，最终返回urls中对应方法的返回值，
+# 判断这个返回值 如果是@view的模板数据，则作为model传入jinja模板中初始化，最终响应http
+# 第二大部分通过 Jinja2TemplateEngine引入模板 根据@view的name取到响应模板初始化
 __author__ = 'ForYou'
 
 import types,os,re,cgi,sys,time,datetime,functools,mimetypes,threading,logging,urllib,traceback
@@ -371,7 +376,7 @@ class MultipartFile(object):
 		self.file = storage.file
 
 
-class Request(object):
+class Request(object):  # 初始化http请求 将dict转换为class
 	def __init__(self, environ):
 		self._environ = environ
 
@@ -547,7 +552,7 @@ class Respense(object):
 	def set_cookie(self, name, value, max_age=None, expires=None, path='/', domain=None, secure=False, http_only=True):
 		if not hasattr(self,'_cookies'):
 			self._cookies = {}
-		L = ['%s=%s' % (_quote(name),_quote(value))]
+		L = ['%s=%s' % (_quote(name), _quote(value))]
 		if expires is not None:
 			if isinstance(expires, (float, int, long)):
 				L.append('Expires=%s' % datetime.datetime.fromtimestamp(expires, UTC_0).strftime('%a,%d-%b-%Y %H:%M:%S GMT'))
@@ -638,20 +643,23 @@ def _default_error_handler(e,start_response,is_debug):
 		# return _debug()
 	return ('<html><body><h1>500 Internal Server Error</h1><h3>%s</h3></body></html>' % str(e))
 
+
 def view(path):
-	def  _decorator(func):
+	def _decorator(func):
 		@functools.wraps(func)
-		def _wrapper(*args,**kw):
-			r = func(*args,**kw)
-			if isinstance(r,dict):
+		def _wrapper(*args, **kw):
+			r = func(*args, **kw)
+			if isinstance(r, dict):
 				logging.info('return Template')
-				return Template(path,**r)
+				return Template(path, **r)
 			raise ValueError('Expect return a dict when using @view() decorator')
 		return _wrapper
 	return _decorator
 
+
 _RE_INTERCEPTROR_STARTS_WITH = re.compile(r'^([^\*\?]+)\*?$')
 _RE_INTERCEPTROR_ENDS_WITH = re.compile(r'^\*([^\*\?]+)$')
+
 
 def _build_pattern_fn(pattern):
 	m = _RE_INTERCEPTROR_STARTS_WITH.match(pattern)
@@ -662,13 +670,15 @@ def _build_pattern_fn(pattern):
 		return lambda p:p.endswith(m.group(1))
 	raise ValueError('Invalid pattern definition in interceptor')
 
+
 def interceptor(pattern='/'):
 	def _decotator(func):
 		func.__interceptor__ = _build_pattern_fn(pattern)
 		return func
 	return _decotator
 
-def _bulid_interceptor_fn(func,next):
+
+def _bulid_interceptor_fn(func, next):
 	def _wrapper():
 		if func.__interceptor__(ctx.request.path_info):
 			return func(next)
@@ -676,12 +686,13 @@ def _bulid_interceptor_fn(func,next):
 			return next()
 	return _wrapper
 
-def _bulid_interceptor_chain(last_fn,*interceptors):
+
+def _bulid_interceptor_chain(last_fn, *interceptors):
 	L = list(interceptors)
 	L.reverse()
 	fn = last_fn
 	for f in L:
-		fn = _bulid_interceptor_fn(f,fn)
+		fn = _bulid_interceptor_fn(f, fn)
 	return fn
 
 
@@ -731,7 +742,7 @@ class WSGIApplication(object):
 			if callable(fn) and hasattr(fn, '__web_route__') and hasattr(fn, '__web_method__'):
 				self.add_url(fn)
 	
-	def add_url(self, func):
+	def add_url(self, func):  # get或者post的方法分类添加到_get_static _post_static _get_dynamic _post_dynamic中
 		self._check_not_running()
 		route = Route(func)
 		if route.is_static:
@@ -746,18 +757,18 @@ class WSGIApplication(object):
 				self._post_dynamic.append(route)
 		logging.info('Add route :%s' % str(route))
 
-	def add_interceptor(self, func):
+	def add_interceptor(self, func):  # 添加拦截器
 		self._check_not_running()
 		self._interceptors.append(func)
 		logging.info('Add interceptors: %s' % str(func))
 
-	def run(self, port=9000, host='127.0.0.1'):
+	def run(self, port=9000, host='127.0.0.1'):  # 启动服务 指定wsgi方法
 		from wsgiref.simple_server import make_server
 		logging.info('application (%s) will start at %s:%s...' % (self._document_root, host, port))
 		server = make_server(host, port, self.get_wsgi_application(debug=True))
 		server.server_forever()
 	
-	def get_wsgi_application(self, debug=False):
+	def get_wsgi_application(self, debug=False):  # 对wsgi方法进行初始化 最后返回一个wsgi方法
 		self._check_not_running()
 		if debug:
 			self._get_dynamic.append(StaticFileRoute())
@@ -769,11 +780,11 @@ class WSGIApplication(object):
 			request_method = ctx.request.request_method
 			path_info = ctx.request.path_info
 			if request_method == 'GET':
-				fn = self._get_static.get(path_info, None)
+				fn = self._get_static.get(path_info, None)  # 先查找静态页面
 				if fn:
 					return fn()
-				for fn in self._get_dynamic:
-					args = fn.match(path_info)
+				for fn in self._get_dynamic:  # 再查找含参动态页面
+					args = fn.match(path_info)  # 根据正则解析匹配的urls方法
 					if args:
 						return fn(*args)
 				raise notfound()
@@ -790,38 +801,38 @@ class WSGIApplication(object):
 
 		fn_exec = _bulid_interceptor_chain(fn_route, *self._interceptors)
 
-		def wsgi(env, start_response):
+		def wsgi(env, start_response):  # wsgi方法 用来取env 包含http请求的dict 和发送http响应的函数start_response
 			ctx.application = _application
 			ctx.request = Request(env)
 			response = ctx.Respense = Respense()
 			try:
-				r = fn_exec()
-				if isinstance(r,Template):
-					r = self._template_engine(r.template_name,r.model)
-				if isinstance(r,unicode):
+				r = fn_exec()  # 有拦截器先判断拦截器 没有拦截器就执行urls中对应的方法（根据path 和method判断） 返回MVC中的M
+				if isinstance(r, Template):  # 如果在urls中指定了view 则执行jinja模板
+					r = self._template_engine(r.template_name, r.model)
+				if isinstance(r, unicode):
 					r = r.encode('utf-8')
 				if r is None:
 					r = []
-				start_response(response.status,response.headers)
+				start_response(response.status, response.headers)
 				return r
-			except RedirectError,e:
-				response.set_header('Location',e.location)
-				start_response(e.status,response.headers)
+			except RedirectError, e:
+				response.set_header('Location', e.location)
+				start_response(e.status, response.headers)
 				return []
-			except HttpError,e:
-				start_response(e.status,response.headers)
-				return ['<html><body><h1>',e.status,'</h1></body></html>']
-			except Exception,e:
+			except HttpError, e:
+				start_response(e.status, response.headers)
+				return ['<html><body><h1>', e.status, '</h1></body></html>']
+			except Exception, e:
 				logging.exception(e)
 				if not debug:
-					start_response('500 Internal Server Error',[])
+					start_response('500 Internal Server Error', [])
 					return ['<html><body><h1>500 Internal Server Error</h1></body></html>']
-				exc_type,exc_value,exc_traceback = sys.exc_info()
+				exc_type, exc_value, exc_traceback = sys.exc_info()
 				fp = StringIO()
-				traceback.print_exception(exc_type,exc_value,exc_traceback,file=fp)
+				traceback.print_exception(exc_type, exc_value, exc_traceback, file=fp)
 				stacks = fp.getvalue()
 				fp.close()
-				start_response('500 Internal Server Error',[])
+				start_response('500 Internal Server Error', [])
 				return [
 					r'''<html><body><h1>500 Internal Server Error</h1><div style="font-family:Monaco, Menlo, Consolas, 'Courier New',  monospace;"><pre>''',stacks.replace('<', '&lt;').replace('>', '&gt;'),'</pre></div></body></html>']
 			finally:
