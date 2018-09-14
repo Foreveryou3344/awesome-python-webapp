@@ -410,7 +410,7 @@ class Request(object):  # 初始化http请求 将dict转换为class
 			return r[0]
 		return r
 
-	def gets(self,key):
+	def gets(self, key):
 		r = self._get_raw_input()[key]
 		if isinstance(r, list):
 			return r[:]

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-
+# 提供字典转json服务 以及错误定义
 __author__ = 'ForYou'
 
 import json
@@ -14,6 +14,11 @@ class APIError(StandardError):
 		self.error = error
 		self.data = data
 		self.message = message
+
+
+class APIValueError(APIError):
+	def __init__(self, field, message=''):
+		super(APIValueError, self).__init__('value:invalid', field, message)
 
 
 def api(func):
