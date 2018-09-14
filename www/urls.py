@@ -3,10 +3,51 @@
 
 __author__ = 'ForYou'
 
-from transwarp.web import get, view, post, ctx
+from transwarp.web import get, view, post, ctx, interceptor
 from models import User, Blog
 from apis import api, APIValueError, APIError
 import re
+import time
+import hashlib
+from config import configs
+
+
+_COOKIE_NAME = 'awesession'
+_COOKIE_KEY = configs.session.secret
+
+
+def make_signed_cookie(id, password, max_age):  # 加密cookie
+	expires = str(int(time.time() + (max_age or 86400)))
+	L = [id, expires, hashlib.md5('%s-%s-%s-%s' % (id, password, expires, _COOKIE_KEY)).hexdigest()]
+	return '-'.join(L)
+
+
+def parse_signed_cookie(cookie_str):  # 解密cookie
+	try:
+		L = cookie_str.split('-')
+		if len(L) != 3:
+			return None
+		id, expires, md5 = L
+		if int(expires) < time.time():
+			return None
+		user = User.get(id)
+		if user is None:
+			return None
+		if md5 != hashlib.md5('%s-%s-%s-%s' % (id, user.password, expires, _COOKIE_KEY)).hexdigest():
+			return None
+		return user
+	except:
+		return None
+
+
+@interceptor('/')
+def user_interceptor(next):
+	user = None
+	cookie = ctx.request.cookies.get(_COOKIE_NAME)
+	if cookie:
+		user = parse_signed_cookie(cookie)
+	ctx.request.user = user
+	return next()
 
 
 @view('test_user.html')
@@ -26,7 +67,7 @@ def index():
 
 @view('register.html')
 @get('/register')
-def register():
+def register():  # 注册模板中使用了vue.js,并在提示时调用$.ajax 使用register_user进行注册
 	return dict()
 
 @api
@@ -58,4 +99,28 @@ def register_user():
 		raise APIError('REGISTER:failed', 'email', 'email is already in use')
 	user = User(name=name, email=email, password=password, image='about:blank')
 	user.insert()
+	return user
+
+
+@view('signin.html')
+@get('/signin')
+def signin():
+	return dict()
+
+
+@api
+@post('/api/authenticate')
+def authenticate():
+	i = ctx.request.input()
+	email = i.email.strip().lower()
+	password = i.password
+	user = User.find_first('where email=?', email)
+	if user is None:
+		raise APIError('auth:failed', 'email', 'Invalid email')
+	elif user.password != password:
+		raise APIError('auth:failed', 'password', 'Invalid password')
+	max_age = 604800
+	cookie = make_signed_cookie(user.id, user.password, max_age)
+	ctx.response.set_cookie(_COOKIE_NAME, cookie, max_age=max_age)
+	user.password = '******'
 	return user

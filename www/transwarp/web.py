@@ -657,17 +657,17 @@ def view(path):
 	return _decorator
 
 
-_RE_INTERCEPTROR_STARTS_WITH = re.compile(r'^([^\*\?]+)\*?$')
-_RE_INTERCEPTROR_ENDS_WITH = re.compile(r'^\*([^\*\?]+)$')
+_RE_INTERCEPTROR_STARTS_WITH = re.compile(r'^([^\*\?]+)\*?$')  # 匹配不以* ？开头的字符一个以上 并在结尾匹配 0或1个*
+_RE_INTERCEPTROR_ENDS_WITH = re.compile(r'^\*([^\*\?]+)$')  # 匹配以* 开头 并后面不以一个以上* ？结尾的字符
 
 
 def _build_pattern_fn(pattern):
 	m = _RE_INTERCEPTROR_STARTS_WITH.match(pattern)
 	if m:
-		return lambda p:p.startswith(m.group(1))
+		return lambda p: p.startswith(m.group(1))
 	m = _RE_INTERCEPTROR_ENDS_WITH.match(pattern)
 	if m:
-		return lambda p:p.endswith(m.group(1))
+		return lambda p: p.endswith(m.group(1))
 	raise ValueError('Invalid pattern definition in interceptor')
 
 
@@ -680,7 +680,7 @@ def interceptor(pattern='/'):
 
 def _bulid_interceptor_fn(func, next):
 	def _wrapper():
-		if func.__interceptor__(ctx.request.path_info):
+		if func.__interceptor__(ctx.request.path_info):  # 如果url包含拦截器定义的开头或结尾，就把url对应的方法传给拦截器的方法next参数
 			return func(next)
 		else:
 			return next()
