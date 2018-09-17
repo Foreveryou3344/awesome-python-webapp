@@ -3,12 +3,13 @@
 
 __author__ = 'ForYou'
 
-from transwarp.web import get, view, post, ctx, interceptor
+from transwarp.web import get, view, post, ctx, interceptor, seeother
 from models import User, Blog
-from apis import api, APIValueError, APIError
+from apis import api, APIValueError, APIError, APIPermissionError
 import re
 import time
 import hashlib
+import logging
 from config import configs
 
 
@@ -40,14 +41,32 @@ def parse_signed_cookie(cookie_str):  # 解密cookie
 		return None
 
 
-@interceptor('/')
+def check_admin():  # 检查管理员权限
+	user = ctx.request.user
+	if user and user.admin:
+		return
+	raise APIPermissionError('No permission')
+
+
+@interceptor('/')  # 添加url以/开头的必经拦截器
 def user_interceptor(next):
+	logging.info('try to bind user from session cookie')
 	user = None
 	cookie = ctx.request.cookies.get(_COOKIE_NAME)
 	if cookie:
 		user = parse_signed_cookie(cookie)
+		if user:
+			logging.info('bind user<%s> to session' % user.email)
 	ctx.request.user = user
 	return next()
+
+
+@interceptor('/manage/')
+def manage_interceptor(next):
+	user = ctx.request.user
+	if user and user.admin:
+		return next()
+	raise seeother('/signin')
 
 
 @view('test_user.html')
@@ -69,6 +88,7 @@ def index():
 @get('/register')
 def register():  # 注册模板中使用了vue.js,并在提示时调用$.ajax 使用register_user进行注册
 	return dict()
+
 
 @api
 @get('/api/users')
@@ -124,3 +144,28 @@ def authenticate():
 	ctx.response.set_cookie(_COOKIE_NAME, cookie, max_age=max_age)
 	user.password = '******'
 	return user
+
+
+@view('manage_blog_edit.html')  # blog编辑页
+@get('/manage/blogs/create')
+def manage_blogs_create():
+	return dict(id=None, action='/api/blogs', redirect='/magage/blogs', user=ctx.request.user)
+
+@api
+@post('/api/blogs')  # blog录入
+def api_create_blog():
+	check_admin()
+	i = ctx.request.input(name='', summary='', content='')
+	name = i.name.strip()
+	summary = i.summary.strip()
+	content = i.content.strip()
+	if not name:
+		raise APIValueError('name', 'name cannot be empty')
+	if not summary:
+		raise APIValueError('summary', 'summary cannot be empty')
+	if not content:
+		raise APIValueError('content', 'content cannot be empty')
+	user = ctx.request.user
+	blog = Blog(user_id=user.id, user_name=user.name, name=name, summary=summary, content=content)
+	blog.insert()
+	return blog

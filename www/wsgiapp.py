@@ -40,6 +40,7 @@ wsgi.template_engine = template_engine
 
 import urls
 wsgi.add_interceptor(urls.user_interceptor)
+wsgi.add_interceptor(urls.manage_interceptor)  # 在url中加了拦截器也要在这个地方关联
 wsgi.add_module(urls)
 
 if __name__ == '__main__':

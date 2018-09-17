@@ -550,13 +550,13 @@ class Respense(object):
 		self.set_cookie(name, '__deleted__', expires=0)
 	
 	def set_cookie(self, name, value, max_age=None, expires=None, path='/', domain=None, secure=False, http_only=True):
-		if not hasattr(self,'_cookies'):
+		if not hasattr(self, '_cookies'):
 			self._cookies = {}
 		L = ['%s=%s' % (_quote(name), _quote(value))]
 		if expires is not None:
 			if isinstance(expires, (float, int, long)):
 				L.append('Expires=%s' % datetime.datetime.fromtimestamp(expires, UTC_0).strftime('%a,%d-%b-%Y %H:%M:%S GMT'))
-			if isinstance(expires,(datetime.date, datetime.datetime)):
+			if isinstance(expires, (datetime.date, datetime.datetime)):
 				L.append('Expires=%s' % expires.astimezone(UTC_0).strftime('%a,%d-%b-%Y %H:%M:%S GMT'))
 		elif isinstance(max_age, (int, long)):
 			L.append('Max-Age=%d' % max_age)
@@ -664,7 +664,7 @@ _RE_INTERCEPTROR_ENDS_WITH = re.compile(r'^\*([^\*\?]+)$')  # 匹配以* 开头 
 def _build_pattern_fn(pattern):
 	m = _RE_INTERCEPTROR_STARTS_WITH.match(pattern)
 	if m:
-		return lambda p: p.startswith(m.group(1))
+		return lambda p: p.startswith(m.group(1)) and not p.startswith('/static')  # static文件夹下的外部文件排除拦截
 	m = _RE_INTERCEPTROR_ENDS_WITH.match(pattern)
 	if m:
 		return lambda p: p.endswith(m.group(1))

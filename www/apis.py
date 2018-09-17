@@ -16,9 +16,14 @@ class APIError(StandardError):
 		self.message = message
 
 
-class APIValueError(APIError):
+class APIValueError(APIError):  # 变量无效
 	def __init__(self, field, message=''):
 		super(APIValueError, self).__init__('value:invalid', field, message)
+
+
+class APIPermissionError(APIError):  # 权限错误
+	def __init__(self, message=''):
+		super(APIPermissionError, self).__init__('permission:forbidden', 'permission', message)
 
 
 def api(func):
