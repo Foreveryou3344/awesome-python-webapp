@@ -5,7 +5,7 @@ __author__ = 'ForYou'
 
 from transwarp.web import get, view, post, ctx, interceptor, seeother
 from models import User, Blog
-from apis import api, APIValueError, APIError, APIPermissionError
+from apis import api, APIValueError, APIError, APIPermissionError, Page
 import re
 import time
 import hashlib
@@ -15,6 +15,15 @@ from config import configs
 
 _COOKIE_NAME = 'awesession'
 _COOKIE_KEY = configs.session.secret
+
+
+def _get_page_index():
+	page_index = 1
+	try:
+		page_index = int(ctx.request.get('page', '1'))
+	except ValueError:
+		pass
+	return page_index
 
 
 def make_signed_cookie(id, password, max_age):  # 加密cookie
@@ -128,6 +137,20 @@ def signin():
 	return dict()
 
 
+def _get_blogs_by_page():
+	total = Blog.count_all()
+	page = Page(total, _get_page_index())
+	blogs = Blog.find_by('order by created_at desc limit ?,?', page.offset, page.limit)
+	return blogs, page
+
+
+@api
+@get('/api/blogs')
+def api_get_blogs():
+	blogs, page = _get_blogs_by_page()
+	return dict(blogs=blogs, page=page)
+
+
 @api
 @post('/api/authenticate')
 def authenticate():
@@ -146,10 +169,16 @@ def authenticate():
 	return user
 
 
+@view('manage_blog_list.html')
+@get('/manage/blogs')
+def manage_blogs():
+	return dict(page_index=_get_page_index(), user=ctx.request.user)
+
+
 @view('manage_blog_edit.html')  # blog编辑页
 @get('/manage/blogs/create')
 def manage_blogs_create():
-	return dict(id=None, action='/api/blogs', redirect='/magage/blogs', user=ctx.request.user)
+	return dict(id=None, action='/api/blogs', redirect='/manage/blogs', user=ctx.request.user)
 
 @api
 @post('/api/blogs')  # blog录入
