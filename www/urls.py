@@ -3,9 +3,9 @@
 
 __author__ = 'ForYou'
 
-from transwarp.web import get, view, post, ctx, interceptor, seeother
+from transwarp.web import get, view, post, ctx, interceptor, seeother, notfound
 from models import User, Blog
-from apis import api, APIValueError, APIError, APIPermissionError, Page
+from apis import api, APIValueError, APIError, APIPermissionError, Page, APIResourceNotFoundError
 import re
 import time
 import hashlib
@@ -145,13 +145,6 @@ def _get_blogs_by_page():
 
 
 @api
-@get('/api/blogs')
-def api_get_blogs():
-	blogs, page = _get_blogs_by_page()
-	return dict(blogs=blogs, page=page)
-
-
-@api
 @post('/api/authenticate')
 def authenticate():  # 登陆
 	i = ctx.request.input()
@@ -175,13 +168,39 @@ def manage_blogs():
 	return dict(page_index=_get_page_index(), user=ctx.request.user)
 
 
-@view('manage_blog_edit.html')  # blog编辑页
+@view('manage_blog_edit.html')  # blog新增编辑页
 @get('/manage/blogs/create')
 def manage_blogs_create():
 	return dict(id=None, action='/api/blogs', redirect='/manage/blogs', user=ctx.request.user)
 
+
+@view('manage_blog_edit.html')  # blog编辑
+@get('/manage/blogs/edit/:blog_id')
+def manage_blogs_edit(blog_id):
+	blog = Blog.get(blog_id)
+	if blog is None:
+		raise notfound()
+	return dict(id=blog.id, name=blog.name, summary=blog.summary, content=blog.content, action='/api/blogs/%s' % blog_id, redirect='/manage/blogs', user=ctx.request.user)
+
+
 @api
-@post('/api/blogs')  # blog录入
+@get('/api/blogs')  # blog列表api
+def api_get_blogs():
+	blogs, page = _get_blogs_by_page()
+	return dict(blogs=blogs, page=page)
+
+
+@api
+@get('/api/blogs/:blog_id')  # 获取blog api
+def api_get_blog(blog_id):
+	blog = Blog.get(blog_id)
+	if blog:
+		return blog
+	raise APIResourceNotFoundError('Blog')
+
+
+@api
+@post('/api/blogs')  # blog新增录入
 def api_create_blog():
 	check_admin()
 	i = ctx.request.input(name='', summary='', content='')
@@ -197,4 +216,28 @@ def api_create_blog():
 	user = ctx.request.user
 	blog = Blog(user_id=user.id, user_name=user.name, name=name, summary=summary, content=content)
 	blog.insert()
+	return blog
+
+
+@api
+@post('/api/blogs/:blog_id')  # blog修改录入
+def api_update_blog(blog_id):
+	check_admin()
+	i = ctx.request.input(name='', summary='', content='')
+	name = i.name.strip()
+	summary = i.summary.strip()
+	content = i.content.strip()
+	if not name:
+		raise APIValueError('name', 'name cannot be empty')
+	if not summary:
+		raise APIValueError('summary', 'summary cannot be empty')
+	if not content:
+		raise APIValueError('content', 'content cannot be empty')
+	blog = Blog.get(blog_id)
+	if blog is None:
+		raise APIResourceNotFoundError('Blog')
+	blog.name = name
+	blog.summary = summary
+	blog.content = content
+	blog.update()
 	return blog

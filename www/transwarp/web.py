@@ -784,7 +784,7 @@ class WSGIApplication(object):
 				if fn:
 					return fn()
 				for fn in self._get_dynamic:  # 再查找含参动态页面
-					args = fn.match(path_info)  # 根据正则解析匹配的urls方法
+					args = fn.match(path_info)  # 根据正则解析匹配的urls方法 并将url中的参数传给处理函数
 					if args:
 						return fn(*args)
 				raise notfound()

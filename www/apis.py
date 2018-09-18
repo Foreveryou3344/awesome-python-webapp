@@ -66,6 +66,11 @@ class APIPermissionError(APIError):  # 权限错误
 		super(APIPermissionError, self).__init__('permission:forbidden', 'permission', message)
 
 
+class APIResourceNotFoundError(APIError):  # 没找到源
+	def __init__(self, field, message=''):
+		super(APIResourceNotFoundError, self).__init__('value:notfound', field, message)
+
+
 def api(func):
 	@functools.wraps(func)
 	def _wrapper(*args, **kw):
