@@ -241,3 +241,14 @@ def api_update_blog(blog_id):
 	blog.content = content
 	blog.update()
 	return blog
+
+
+@api
+@post('/api/blogs/:blog_id/delete')
+def api_delete_blog(blog_id):
+	check_admin()
+	blog = Blog.get(blog_id)
+	if blog is None:
+		raise APIResourceNotFoundError('blog')
+	blog.delete()
+	return dict(id=blog_id)
