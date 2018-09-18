@@ -26,6 +26,13 @@ def _get_page_index():
 	return page_index
 
 
+def _get_blogs_by_page():
+	total = Blog.count_all()
+	page = Page(total, _get_page_index())
+	blogs = Blog.find_by('order by created_at desc limit ?,?', page.offset, page.limit)
+	return blogs, page
+
+
 def make_signed_cookie(id, password, max_age):  # 加密cookie
 	expires = str(int(time.time() + (max_age or 86400)))
 	L = [id, expires, hashlib.md5('%s-%s-%s-%s' % (id, password, expires, _COOKIE_KEY)).hexdigest()]
@@ -137,11 +144,10 @@ def signin():
 	return dict()
 
 
-def _get_blogs_by_page():
-	total = Blog.count_all()
-	page = Page(total, _get_page_index())
-	blogs = Blog.find_by('order by created_at desc limit ?,?', page.offset, page.limit)
-	return blogs, page
+@get('/signout')
+def signout():
+	ctx.respense.delete_cookie(_COOKIE_NAME)
+	raise seeother('/')
 
 
 @api
@@ -162,7 +168,7 @@ def authenticate():  # 登陆
 	return user
 
 
-@view('manage_blog_list.html')
+@view('manage_blog_list.html')  # blog管理列表页
 @get('/manage/blogs')
 def manage_blogs():
 	return dict(page_index=_get_page_index(), user=ctx.request.user)
@@ -244,7 +250,7 @@ def api_update_blog(blog_id):
 
 
 @api
-@post('/api/blogs/:blog_id/delete')
+@post('/api/blogs/:blog_id/delete')  # blog 删除
 def api_delete_blog(blog_id):
 	check_admin()
 	blog = Blog.get(blog_id)
