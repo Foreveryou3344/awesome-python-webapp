@@ -4,7 +4,7 @@
 __author__ = 'ForYou'
 
 from transwarp.web import get, view, post, ctx, interceptor, seeother, notfound
-from models import User, Blog
+from models import User, Blog, Comment
 from apis import api, APIValueError, APIError, APIPermissionError, Page, APIResourceNotFoundError
 import re
 import time
@@ -92,12 +92,21 @@ def test_users():
 	return dict(users=users)
 
 
-@view('blogs.html')
+@view('blogs.html')  # 和manage_blog_list不同的事，管理页需要删除编辑等交互操作，所以我们把分页的内容交给vue渲染，这里面只需要渲染一次所以就用jinja渲染就行
 @get('/')
 def index():
-	blogs = Blog.find_all()
-	user = User.find_first('where email=?', 'test@example.com')
-	return dict(blogs=blogs, user=user)
+	blogs, page = _get_blogs_by_page()
+	return dict(page=page, blogs=blogs, user=ctx.request.user)
+
+
+@view('blog.html')
+@get('/blog/:blog_id')
+def blog(blog_id):
+	blog = Blog.get(blog_id)
+	if blog is None:
+		raise notfound()
+	comments = Comment.find_by('where blog_id=? order by created_at desc limit 1000', blog_id)
+	return dict(blog=blog, comments=comments, user=ctx.request.user)
 
 
 @view('register.html')
@@ -146,7 +155,7 @@ def signin():
 
 @get('/signout')
 def signout():
-	ctx.respense.delete_cookie(_COOKIE_NAME)
+	ctx.response.delete_cookie(_COOKIE_NAME)
 	raise seeother('/')
 
 
