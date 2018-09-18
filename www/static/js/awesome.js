@@ -140,7 +140,7 @@ if (! Number.prototype.toDateTime) {
 
 function gotoPage(index) {
     if (index) {
-        var search = location.search;
+        var search = location.search;  //取url中的参数部分含问号
         var hasPageParam = search.search(/page\=\d+\&?/)!==(-1);
         if (hasPageParam) {
             search = search.replace(/page\=\d+\&?/g, '');

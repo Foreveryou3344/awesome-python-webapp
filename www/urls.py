@@ -20,7 +20,7 @@ _COOKIE_KEY = configs.session.secret
 def _get_page_index():
 	page_index = 1
 	try:
-		page_index = int(ctx.request.get('page', '1'))
+		page_index = int(ctx.request.get('page', '1'))  # 取url后接的参数
 	except ValueError:
 		pass
 	return page_index
@@ -153,7 +153,7 @@ def api_get_blogs():
 
 @api
 @post('/api/authenticate')
-def authenticate():
+def authenticate():  # 登陆
 	i = ctx.request.input()
 	email = i.email.strip().lower()
 	password = i.password
