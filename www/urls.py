@@ -161,6 +161,9 @@ def register_user():
 		raise APIError('REGISTER:failed', 'email', 'email is already in use')
 	user = User(name=name, email=email, password=password, image='about:blank')
 	user.insert()
+	max_age = 604800
+	cookie = make_signed_cookie(user.id, user.password, max_age)
+	ctx.response.set_cookie(_COOKIE_NAME, cookie, max_age=max_age)  # 注册后直接完成登陆
 	return user
 
 
@@ -250,6 +253,8 @@ def api_delete_user(user_id):
 	if user is None:
 		raise APIResourceNotFoundError('user')
 	user.delete()
+	Blog.delete_by('where user_id = ?', user_id)
+	Comment.delete_by('where user_id = ?', user_id)
 	return dict(id=user_id)
 
 
@@ -342,4 +347,5 @@ def api_delete_blog(blog_id):
 	if blog is None:
 		raise APIResourceNotFoundError('blog')
 	blog.delete()
+	Comment.delete_by('where blog_id = ?', blog_id)
 	return dict(id=blog_id)

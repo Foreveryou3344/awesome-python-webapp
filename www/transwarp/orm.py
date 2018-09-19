@@ -260,6 +260,11 @@ class Model(dict):
 		return [cls(**d) for d in L]
 
 	@classmethod
+	def delete_by(cls, where, *args):
+		db.update('delete from `%s` %s' % (cls.__table__, where), *args)
+		return
+
+	@classmethod
 	def count_all(cls):
 		return db.select_int('select count(`%s`) from `%s`' % (cls.__primary_key__.name,cls.__table__))
 
