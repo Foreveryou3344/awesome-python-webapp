@@ -380,7 +380,7 @@ class Request(object):  # 初始化http请求 将dict转换为class
 	def __init__(self, environ):
 		self._environ = environ
 
-	def _parse_input(self):
+	def _parse_input(self):  # 取到请求中的所有参数 包括url后面的 post中的 表单中的
 		def _convert(item):
 			if isinstance(item, list):
 				return [_to_unicode(i.value) for i in item]
@@ -404,7 +404,7 @@ class Request(object):  # 初始化http请求 将dict转换为class
 			return r[0]
 		return r
 
-	def get(self, key, default=None):
+	def get(self, key, default=None):  # 取单个参数
 		r = self._get_raw_input().get(key, default)
 		if isinstance(r, list):
 			return r[0]
@@ -416,7 +416,7 @@ class Request(object):  # 初始化http请求 将dict转换为class
 			return r[:]
 		return [r]
 
-	def input(self, **kw):
+	def input(self, **kw):  # 取所有的参数dict，并可以用.取值
 		copy = Dict(**kw)
 		raw = self._get_raw_input()
 		for k, v in raw.iteritems():

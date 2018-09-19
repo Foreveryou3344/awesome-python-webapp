@@ -109,6 +109,23 @@ def blog(blog_id):
 	return dict(blog=blog, comments=comments, user=ctx.request.user)
 
 
+@api
+@post('/api/blogs/:blog_id/comments')  # 添加评论api
+def api_create_blog_comment(blog_id):
+	user = ctx.request.user
+	if user is None:
+		raise APIPermissionError('need signin')
+	blog = Blog.get(blog_id)
+	if blog is None:
+		raise APIResourceNotFoundError('Blog')
+	content = ctx.request.input(content='').content.strip()
+	if not content:
+		raise APIValueError('content')
+	c = Comment(blog_id=blog_id, user_id=user.id, user_name=user.name, user_image=user.image, content=content)
+	c.insert()
+	return dict(comment=c)
+
+
 @view('register.html')
 @get('/register')
 def register():  # 注册模板中使用了vue.js,并在提示时调用$.ajax 使用register_user进行注册
@@ -177,14 +194,14 @@ def authenticate():  # 登陆
 	return user
 
 
-@view('manage_user_list.html')
+@view('manage_user_list.html')  # 用户列表管理
 @get('/manage/users')
 def manage_users():
 	return dict(page_index=_get_page_index(), user=ctx.request.user)
 
 
 @api
-@get('/api/users')
+@get('/api/users')  # 获取用户列表api
 def api_get_users():
 	total = User.count_all()
 	page = Page(total, _get_page_index())
