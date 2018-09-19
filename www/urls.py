@@ -177,6 +177,23 @@ def authenticate():  # 登陆
 	return user
 
 
+@view('manage_user_list.html')
+@get('/manage/users')
+def manage_users():
+	return dict(page_index=_get_page_index(), user=ctx.request.user)
+
+
+@api
+@get('/api/users')
+def api_get_users():
+	total = User.count_all()
+	page = Page(total, _get_page_index())
+	users = User.find_by('order by created_at desc limit ?,?', page.offset, page.limit)
+	for u in users:
+		u.password = '******'
+	return dict(page=page, users=users)
+
+
 @view('manage_blog_list.html')  # blog管理列表页
 @get('/manage/blogs')
 def manage_blogs():
