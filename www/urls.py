@@ -128,7 +128,7 @@ def api_create_blog_comment(blog_id):
 
 @view('register.html')
 @get('/register')
-def register():  # 注册模板中使用了vue.js,并在提示时调用$.ajax 使用register_user进行注册
+def register():  # 注册模板中使用了vue.js,并在提交时调用$.ajax 使用register_user进行注册
 	return dict()
 
 
@@ -194,6 +194,37 @@ def authenticate():  # 登陆
 	return user
 
 
+@get('/manage/')  # 管理界面初始页
+def manage_index():
+	raise seeother('/manage/comments')
+
+
+@view('manage_comment_list.html')  # 评论管理列表
+@get('/manage/comments')
+def manage_comments():
+	return dict(page_index=_get_page_index(), user=ctx.request.user)
+
+
+@api
+@get('/api/comments')  # 获取评论api
+def api_get_comments():
+	total = Comment.count_all()
+	page = Page(total, _get_page_index())
+	comments = Comment.find_by('order by created_at desc limit ?,?', page.offset, page.limit)
+	return dict(comments=comments, page=page)
+
+
+@api
+@post('/api/comments/:comment_id/delete')  # 删除评论
+def api_delete_comment(comment_id):
+	check_admin()
+	comment = Comment.get(comment_id)
+	if comment is None:
+		raise APIResourceNotFoundError('Comment')
+	comment.delete()
+	return dict(id=comment_id)
+
+
 @view('manage_user_list.html')  # 用户列表管理
 @get('/manage/users')
 def manage_users():
@@ -209,6 +240,17 @@ def api_get_users():
 	for u in users:
 		u.password = '******'
 	return dict(page=page, users=users)
+
+
+@api
+@post('/api/users/:user_id/delete')  # 用户 删除
+def api_delete_user(user_id):
+	check_admin()
+	user = User.get(user_id)
+	if user is None:
+		raise APIResourceNotFoundError('user')
+	user.delete()
+	return dict(id=user_id)
 
 
 @view('manage_blog_list.html')  # blog管理列表页
