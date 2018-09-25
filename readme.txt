@@ -1,2 +1,1 @@
-god is a girl
-git is free software
+the first blog web

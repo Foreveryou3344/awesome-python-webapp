@@ -45,3 +45,5 @@ wsgi.add_module(urls)
 
 if __name__ == '__main__':
 	wsgi.run(9000)
+else:
+	application = wsgi.get_wsgi_application()
