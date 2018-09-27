@@ -39,3 +39,7 @@ def deploy():
 		run('ln -s %s www' % newdir)
 		# sudo('chown www-date:www-data www')
 		# sudo('chowm -R www-date:www-data %s' % newdir)
+	with settings(warn_only=True):
+		run('supervisorctl -c /etc/supervisor/supervisord.conf stop awesome')
+		run('supervisorctl -c /etc/supervisor/supervisord.conf start awesome')
+		run('/etc/init.d/nginx reload')
