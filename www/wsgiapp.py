@@ -5,7 +5,7 @@ __author__ = 'ForYou'
 
 import logging; logging.basicConfig(level=logging.INFO)
 import time
-import datetime
+from datetime import datetime
 import os
 
 from transwarp import db
