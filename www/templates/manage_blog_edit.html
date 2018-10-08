@@ -13,6 +13,9 @@
                 submit: function (event) {
                     event.preventDefault();
                     startLoading();
+                    this.name = $("#form-blog input[name='name']").val();
+                    this.summary = $("#form-blog textarea[name='summary']").val();
+                    this.content = $("#form-blog textarea[name='content']").val();
                     postApi(action,this.$data,function (err,result) {
                         if(err) {
                             alert(err.message);
